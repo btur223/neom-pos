@@ -45,7 +45,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F1EA] text-[#123B36]" dir="rtl">
-      {/* الشريط العلوي */}
       <header className="bg-[#123B36] text-[#F6F3EC] px-4 py-3 flex items-center justify-between shadow-md sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <span className="font-extrabold text-xl tracking-wide">{settings.shopName || 'نيوم'}</span>
@@ -69,7 +68,6 @@ export default function App() {
         </nav>
       </header>
 
-      {/* المحتوى الرئيسي */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4">
         {tab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} user={user} currency={settings.currency} shopName={settings.shopName} />}
         {tab === 'materials' && <MaterialsScreen ingredients={ingredients} shipments={shipments} currency={settings.currency} />}
@@ -81,7 +79,6 @@ export default function App() {
   )
 }
 
-/* ==================== 1. شاشة الكاشير السريع ==================== */
 function SalesScreen({ items, recipes, ingredients, invoices, user, currency, shopName }) {
   const [cat, setCat] = useState('الكل')
   const [q, setQ] = useState('')
@@ -120,7 +117,6 @@ function SalesScreen({ items, recipes, ingredients, invoices, user, currency, sh
         cashierName: user.displayName,
         stockDeducted: true,
       })
-      // خصم الخامات تلقائياً بالجرام حسب الوصفة
       for (const line of cart) {
         const rec = recipes.find((r) => r.itemId === line.id || r.itemName === line.name)
         if (rec?.lines?.length) {
@@ -137,7 +133,6 @@ function SalesScreen({ items, recipes, ingredients, invoices, user, currency, sh
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      {/* قائمة الأصناف */}
       <div className="lg:col-span-2 space-y-3">
         <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-2xl shadow-sm">
           <div className="relative flex-1 min-w-[180px]">
@@ -172,7 +167,6 @@ function SalesScreen({ items, recipes, ingredients, invoices, user, currency, sh
         )}
       </div>
 
-      {/* سلة الطلب والدفع */}
       <div className="bg-white p-4 rounded-2xl shadow-md border border-[#123B36]/10 flex flex-col justify-between h-fit sticky top-20">
         <div>
           <div className="flex items-center justify-between border-b pb-3 mb-3">
@@ -193,3 +187,6 @@ function SalesScreen({ items, recipes, ingredients, invoices, user, currency, sh
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: Math.max(1, x.qty - 1) } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">-</button>
                     <span className="w-5 text-center font-bold">{l.qty}</span>
+                    <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: x.qty + 1 } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">+</button>
+                    <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="text-red-600 p-1"><Trash2 size={15} /></button>
+                  </div>
