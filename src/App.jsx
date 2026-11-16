@@ -26,7 +26,7 @@ export default function App() {
   const { data: invoices } = useLiveShared('invoices', { order: '-createdAt', limit: 200 })
   const { data: shipments } = useLiveShared('shipments', { order: '-createdAt', limit: 100 })
   const { data: settingsList } = useLiveShared('settings')
-  const settings = settingsList?.[0] || { id: 'main', currency: 'ر.ع', ownerPhone: '', shopName: 'نيوم' }
+  const settings = settingsList[0] || { id: 'main', currency: 'ر.ع', ownerPhone: '', shopName: 'نيوم' }
 
   if (!user) return <TeamLogin appName={settings.shopName || 'نيوم'} onSignedIn={() => setUser(auth.getCurrentUser())} />
 
