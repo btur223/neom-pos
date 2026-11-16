@@ -26,7 +26,7 @@ export default function App() {
   const { data: invoices } = useLiveShared('invoices', { order: '-createdAt', limit: 200 })
   const { data: shipments } = useLiveShared('shipments', { order: '-createdAt', limit: 100 })
   const { data: settingsList } = useLiveShared('settings')
-  const settings = settingsList[0] || { id: 'main', currency: 'ر.ع', ownerPhone: '', shopName: 'نيوم' }
+  const settings = (settingsList && settingsList.length > 0) ? settingsList : { id: 'main', currency: 'ر.ع', ownerPhone: '', shopName: 'نيوم' }
 
   if (!user) return <TeamLogin appName={settings.shopName || 'نيوم'} onSignedIn={() => setUser(auth.getCurrentUser())} />
 
@@ -119,7 +119,7 @@ function SalesScreen({ items, recipes, ingredients, invoices, user, currency, sh
       })
       for (const line of cart) {
         const rec = recipes.find((r) => r.itemId === line.id || r.itemName === line.name)
-        if (rec?.lines?.length) {
+        if (rec && rec.lines && rec.lines.length) {
           for (const rl of rec.lines) {
             const ing = ingredients.find((x) => x.id === rl.ingredientId || x.name === rl.name)
             if (ing) await db.incrementShared('ingredients', ing.id, 'stock', -(Number(rl.qty) * line.qty))
@@ -188,5 +188,3 @@ function SalesScreen({ items, recipes, ingredients, invoices, user, currency, sh
                     <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: Math.max(1, x.qty - 1) } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">-</button>
                     <span className="w-5 text-center font-bold">{l.qty}</span>
                     <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: x.qty + 1 } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">+</button>
-                    <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="text-red-600 p-1"><Trash2 size={15} /></button>
-                  </div>
