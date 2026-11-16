@@ -111,3 +111,42 @@ function SalesScreen({ items, recipes, ingredients, invoices, user, currency, sh
           <button onClick={checkout} disabled={!cart.length || busy} className="w-full py-3.5 rounded-xl bg-[#123B36] text-white font-extrabold text-base disabled:opacity-40">{busy ? 'جاري الحفظ...' : 'إتمام البيع'}</button>
           {lastReceipt && <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex items-center justify-between text-xs"><span className="font-bold text-emerald-800">تم حفظ {lastReceipt.number}</span><button onClick={() => window.print()} className="flex items-center gap-1 bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold"><Printer size={14} /> طباعة</button></div>}
         </div>
+
+        {lastReceipt && <div id="receipt-print" className="hidden print:block p-4 text-center text-xs" dir="rtl"><h3 className="font-bold text-base">{shopName || 'نيوم'}</h3><p>طلب: {lastReceipt.number} | {lastReceipt.date}</p><hr className="my-2" />{lastReceipt.lines.map((l) => <div key={l.id} className="flex justify-between my-1"><span>{l.name} × {l.qty}</span><span>{fmt(l.price * l.qty)}</span></div>)}<hr className="my-2" /><p className="font-bold">الإجمالي: {fmt(lastReceipt.total)} {currency}</p></div>}
+      </div>
+    </div>
+  )
+}
+
+function MaterialsScreen({ ingredients, shipments, currency }) {
+  const [material, setMaterial] = useState(''); const [qty, setQty] = useState(''); const [unit, setUnit] = useState('كيلو'); const [price, setPrice] = useState(''); const [supplier, setSupplier] = useState(''); const [done, setDone] = useState(false)
+  async function handleSave(e) {
+    e.preventDefault(); if (!material || !qty) return
+    const numQty = Number(qty); const baseQty = numQty * ((unit === 'كيلو' || unit === 'لتر') ? 1000 : 1)
+    const baseUnit = unit === 'كيلو' ? 'جم' : unit === 'لتر' ? 'مل' : unit; const totalCost = Number(price || 0); const unitCost = baseQty > 0 ? totalCost / baseQty : 0
+    await db.insertShared('shipments', { date: todayStr(), material, supplier, qty: numQty, price: totalCost, total: totalCost })
+    const existing = ingredients.find((i) => i.name.trim() === material.trim())
+    if (existing) { await db.incrementShared('ingredients', existing.id, 'stock', baseQty); if (unitCost > 0) await db.updateShared('ingredients', existing.id, { cost: unitCost }) }
+    else { await db.insertShared('ingredients', { name: material.trim(), unit: baseUnit, stock: baseQty, cost: unitCost, minStock: 500 }) }
+    setMaterial(''); setQty(''); setPrice(''); setSupplier(''); setDone(true); setTimeout(() => setDone(false), 3000)
+  }
+  return (
+    <div className="max-w-xl mx-auto space-y-4">
+      <form onSubmit={handleSave} className="bg-white p-5 rounded-2xl shadow-sm space-y-4 border border-[#123B36]/10">
+        <h2 className="font-extrabold text-lg">تسجيل استلام خامات جديدة</h2>
+        <div><label className="block text-xs font-bold mb-1">اسم المادة</label><input list="ing-list" value={material} onChange={(e) => setMaterial(e.target.value)} required className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /><datalist id="ing-list">{ingredients.map((i) => <option key={i.id} value={i.name} />)}</datalist></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="block text-xs font-bold mb-1">الكمية</label><input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} required className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
+          <div><label className="block text-xs font-bold mb-1">الوحدة</label><select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm font-bold"><option value="كيلو">كيلو (جرام)</option><option value="جرام">جرام</option><option value="لتر">لتر (مل)</option><option value="مل">مل</option><option value="حبة">حبة</option></select></div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="block text-xs font-bold mb-1">السعر ({currency})</label><input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
+          <div><label className="block text-xs font-bold mb-1">المورد</label><input value={supplier} onChange={(e) => setSupplier(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
+        </div>
+        {done && <div className="p-3 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-2"><CheckCircle2 size={16} /> تم الحفظ!</div>}
+        <button type="submit" className="w-full py-3.5 rounded-xl bg-[#123B36] text-white font-extrabold text-sm">حفظ وإضافة للمخزون</button>
+      </form>
+      <div className="bg-white p-4 rounded-2xl shadow-sm"><h3 className="font-bold text-sm mb-3">آخر المواد المستلمة</h3><div className="space-y-2">{shipments.slice(0, 8).map((s) => <div key={s.id} className="flex justify-between items-center text-xs bg-[#F4F1EA] p-2.5 rounded-xl"><div><span className="font-bold">{s.material}</span> ({s.date})</div><div className="font-bold">{s.qty} | {fmt(s.total)} {currency}</div></div>)}</div></div>
+    </div>
+  )
+}
