@@ -323,6 +323,7 @@ const SEED_RECIPES = [
   { itemName: 'ابريق حليب فريش كبير', lines: [{ name: 'حليب', qty: 1000 }, { name: 'شاي احمر ورق', qty: 30 }, { name: 'سكر خشن', qty: 90 }] },
   // الايس كريم
   { itemName: 'ايس كريم مانجو', lines: [{ name: 'ايس كريم مانجو', qty: 150 }] },
+  ]
   export function DashboardScreen({ invoices, ingredients, recipes, settings }) {
   const { data: expenses } = useLiveShared('expenses', { order: '-createdAt', limit: 100 })
   const [expTitle, setExpTitle] = useState('')
