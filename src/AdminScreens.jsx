@@ -227,6 +227,7 @@ const SEED_INGREDIENTS = [
   { name: 'نعناع فريش', stock: 1500, unit: 'جم', cost: 0.002, minStock: 300 },
   { name: 'ليمون طازج', stock: 5000, unit: 'جم', cost: 0.001, minStock: 1000 },
   { name: 'فراولة طازجة', stock: 3000, unit: 'جم', cost: 0.0025, minStock: 500 },
+  ]
 const SEED_RECIPES = [
   // المشروبات الغازية
   { itemName: 'السي كولا', lines: [{ name: 'السي كولا', qty: 1 }] },
