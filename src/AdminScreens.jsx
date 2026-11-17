@@ -323,6 +323,35 @@ const SEED_RECIPES = [
   { itemName: 'ابريق حليب فريش كبير', lines: [{ name: 'حليب', qty: 1000 }, { name: 'شاي احمر ورق', qty: 30 }, { name: 'سكر خشن', qty: 90 }] },
   // الايس كريم
   { itemName: 'ايس كريم مانجو', lines: [{ name: 'ايس كريم مانجو', qty: 150 }] },
+  { itemName: 'ايس كريم فانيليا', lines: [{ name: 'ايس كريم فانيليا', qty: 150 }] },
+  { itemName: 'ايس كريم شوكولاته', lines: [{ name: 'ايس كريم شوكولاته', qty: 150 }] },
+  { itemName: 'ايس كريم فراولة', lines: [{ name: 'ايس كريم فراولة', qty: 150 }] },
+  { itemName: 'ايس كريم مكس', lines: [{ name: 'ايس كريم مانجو', qty: 50 }, { name: 'ايس كريم فانيليا', qty: 50 }, { name: 'ايس كريم شوكولاته', qty: 50 }] },
+  // الحلويات
+  { itemName: 'تشيز كيك', lines: [{ name: 'تشيز كيك جاهز', qty: 1 }] },
+  { itemName: 'كنافة قشطة', lines: [{ name: 'عجينة كنافة', qty: 150 }, { name: 'قشطة', qty: 80 }, { name: 'سمنة', qty: 30 }, { name: 'فستق', qty: 10 }] },
+  { itemName: 'كنافة جبنة', lines: [{ name: 'عجينة كنافة', qty: 150 }, { name: 'جبن عكاوي', qty: 80 }, { name: 'سمنة', qty: 30 }, { name: 'فستق', qty: 10 }] },
+  { itemName: 'ام علي', lines: [{ name: 'ملفيه', qty: 100 }, { name: 'حليب', qty: 180 }, { name: 'تصنيعية كريم شانتي', qty: 60 }, { name: 'فستق', qty: 10 }, { name: 'جوز هند', qty: 10 }] },
+  { itemName: 'سان سبيستيان', lines: [{ name: 'سان سبيستيان جاهز', qty: 1 }, { name: 'صوص شوكليت', qty: 30 }] },
+  { itemName: 'كريم كراميل', lines: [{ name: 'كريم كراميل جاهز', qty: 1 }] },
+  { itemName: 'مهلبية', lines: [{ name: 'مهلبية جاهزة', qty: 1 }] },
+  // الإضافات
+  { itemName: 'إضافة صوص شوكليت', lines: [{ name: 'صوص شوكليت', qty: 25 }] },
+  { itemName: 'إضافة صوص نوتيلا', lines: [{ name: 'نوتيلا', qty: 25 }] },
+  { itemName: 'إضافة توبينج اناناس', lines: [{ name: 'توبينج اناناس', qty: 25 }] },
+  { itemName: 'إضافة توبينج باشن', lines: [{ name: 'توبينج باشن', qty: 25 }] },
+  { itemName: 'إضافة باكيت شاي احمر', lines: [{ name: 'شاي احمر باكيت', qty: 1 }] },
+  { itemName: 'إضافة عسل النحل', lines: [{ name: 'عسل نحل', qty: 20 }] },
+  // البوفيهات والضيافة
+  { itemName: 'سفنديش ام علي كبير', lines: [{ name: 'حليب', qty: 1000 }, { name: 'بندق', qty: 15 }, { name: 'لوز', qty: 15 }, { name: 'فستق', qty: 20 }, { name: 'جوز هند', qty: 30 }, { name: 'ملفيه', qty: 650 }, { name: 'تصنيعية كريم شانتي', qty: 700 }] },
+  { itemName: 'سفنديش ام علي وسط', lines: [{ name: 'حليب', qty: 500 }, { name: 'بندق', qty: 15 }, { name: 'لوز', qty: 15 }, { name: 'فستق', qty: 20 }, { name: 'جوز هند', qty: 30 }, { name: 'ملفيه', qty: 400 }, { name: 'تصنيعية كريم شانتي', qty: 400 }] },
+  { itemName: 'صحن شمام كبير', lines: [{ name: 'كنتالوب', qty: 1750 }] },
+  { itemName: 'صحن شمام وسط', lines: [{ name: 'كنتالوب', qty: 1300 }] },
+  { itemName: 'صحن بطيخ كبير', lines: [{ name: 'بطيخ', qty: 3170 }] },
+  { itemName: 'صحن بطيخ وسط', lines: [{ name: 'بطيخ', qty: 2440 }] },
+  { itemName: 'عصير تانك برتقال', lines: [{ name: 'عصير تانك برتقال', qty: 370 }, { name: 'سكر خشن', qty: 440 }] },
+  { itemName: 'عصير تانك مانجو', lines: [{ name: 'عصير تانك مانجو', qty: 370 }, { name: 'سكر خشن', qty: 440 }] },
+  { itemName: 'عصير فيمتو', lines: [{ name: 'فيمتو', qty: 500 }, { name: 'سكر خشن', qty: 440 }] },
   ]
   export function DashboardScreen({ invoices, ingredients, recipes, settings }) {
   const { data: expenses } = useLiveShared('expenses', { order: '-createdAt', limit: 100 })
