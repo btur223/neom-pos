@@ -132,6 +132,7 @@ const SEED_ITEMS = [
   { name: 'عصير تانك برتقال', price: 5.000, category: 'البوفيهات والضيافة' },
   { name: 'عصير تانك مانجو', price: 5.000, category: 'البوفيهات والضيافة' },
   { name: 'عصير فيمتو', price: 5.000, category: 'البوفيهات والضيافة' },
+]
 const SEED_INGREDIENTS = [
   // المشروبات الغازية والمياه
   { name: 'السي كولا', stock: 100, unit: 'حبة', cost: 0.150, minStock: 20 },
