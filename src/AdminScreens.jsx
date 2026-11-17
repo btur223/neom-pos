@@ -528,3 +528,125 @@ export function InventoryScreen({ items, ingredients, currency }) {
       )}
 
       {subTab === 'recipes' && (
+        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-4">
+          <form onSubmit={addRecipeLine} className="flex flex-wrap gap-2">
+            <select value={selectedItem} onChange={(e) => setSelectedItem(e.target.value)} className="flex-1 min-w-[160px] bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none">
+              <option value="">اختر الصنف من المنيو...</option>
+              {items.map((i) => <option key={i.id} value={i.name}>{i.name}</option>)}
+            </select>
+            <select value={recIng} onChange={(e) => setRecIng(e.target.value)} className="flex-1 min-w-[160px] bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none">
+              <option value="">اختر المادة الخام...</option>
+              {ingredients.map((ing) => <option key={ing.id} value={ing.name}>{ing.name} ({ing.unit})</option>)}
+            </select>
+            <input type="number" step="0.01" value={recQty} onChange={(e) => setRecQty(e.target.value)} placeholder="الكمية (جم/مل/حبة)" className="w-32 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
+            <button className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1"><BookOpen size={15} /> ربط بالرسبي</button>
+          </form>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto">
+            {recipes.map((r) => (
+              <div key={r.id} className="bg-[#F4F1EA] p-3 rounded-xl text-xs space-y-1">
+                <div className="flex justify-between font-extrabold text-[#123B36]">
+                  <span>{r.itemName}</span>
+                  <button onClick={() => db.deleteShared('recipes', r.id)} className="text-red-500"><Trash2 size={14} /></button>
+                </div>
+                <div className="text-[#123B36]/75 flex flex-wrap gap-1.5 pt-1">
+                  {(r.lines || []).map((l, idx) => (
+                    <span key={idx} className="bg-white px-2 py-0.5 rounded-lg border border-[#123B36]/10">{l.name}: {l.qty}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function SettingsScreen({ settings }) {
+  const { data: items } = useLiveShared('items')
+  const { data: ingredients } = useLiveShared('ingredients')
+  const { data: recipes } = useLiveShared('recipes')
+  const [shopName, setShopName] = useState(settings?.shopName || 'نيوم')
+  const [currency, setCurrency] = useState(settings?.currency || 'ر.ع')
+  const [seeding, setSeeding] = useState(false)
+  const [seedDone, setSeedDone] = useState(false)
+
+  async function saveSettings(e) {
+    e.preventDefault()
+    if (settings?.id && settings.id !== 'main') {
+      await db.updateShared('settings', settings.id, { shopName, currency })
+    } else {
+      await db.insertShared('settings', { shopName, currency })
+    }
+    alert('تم حفظ الإعدادات بنجاح')
+  }
+
+  async function importFullData() {
+    if (seeding) return
+    if (!confirm('سيتم استيراد المنيو الكامل (111 صنف)، الجرد، والرسبي الكامل وتوليد الأكواد تلقائيًا. هل تريد المتابعة؟')) return
+    setSeeding(true)
+    try {
+      const existingItemNames = new Set(items.map((i) => i.name))
+      for (const it of SEED_ITEMS) {
+        if (!existingItemNames.has(it.name)) {
+          await db.insertShared('items', it)
+        }
+      }
+      const existingIngNames = new Set(ingredients.map((i) => i.name))
+      for (const ing of SEED_INGREDIENTS) {
+        if (!existingIngNames.has(ing.name)) {
+          await db.insertShared('ingredients', ing)
+        }
+      }
+      const existingRecNames = new Set(recipes.map((r) => r.itemName))
+      for (const rec of SEED_RECIPES) {
+        if (!existingRecNames.has(rec.itemName)) {
+          await db.insertShared('recipes', rec)
+        }
+      }
+      setSeedDone(true)
+    } finally {
+      setSeeding(false)
+    }
+  }
+
+  return (
+    <div className="max-w-xl mx-auto space-y-4">
+      <div className="bg-gradient-to-l from-[#123B36] to-[#1e574f] text-white p-5 rounded-2xl shadow-md space-y-3">
+        <div className="flex items-center gap-2 font-extrabold text-base">
+          <Sparkles size={20} className="text-amber-300" />
+          <span>تعبئة المنيو والجرد والرسبي الكامل</span>
+        </div>
+        <p className="text-xs text-white/80 leading-relaxed">
+          اضغط على الزر بالأسفل لإدخال كافة أصناف المنيو (111 صنفًا) والمواد الخام النظيفة ومقادير الرسبي دفعة واحدة، وسيقوم النظام بتوليد الأكواد وربط الخصم التلقائي للمخزون.
+        </p>
+        <button
+          onClick={importFullData}
+          disabled={seeding}
+          className="w-full bg-amber-400 hover:bg-amber-300 text-[#123B36] font-extrabold py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition"
+        >
+          <Database size={18} />
+          {seeding ? 'جاري استيراد البيانات وربط الرسبي...' : seedDone ? 'تم الاستيراد بنجاح! اضغط لتحديث النواقص' : 'استيراد المنيو والجرد والرسبي الآن'}
+        </button>
+        {seedDone && (
+          <div className="flex items-center gap-2 text-xs text-emerald-200 font-bold">
+            <CheckCircle2 size={16} /> تم زرع جميع البيانات بنجاح! انتقل إلى "الكاشير" أو "المخزن والوصفات".
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={saveSettings} className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
+        <h3 className="font-extrabold text-sm">إعدادات المتجر</h3>
+        <div>
+          <label className="text-xs font-bold block mb-1">اسم المشروع</label>
+          <input value={shopName} onChange={(e) => setShopName(e.target.value)} className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl text-sm outline-none" />
+        </div>
+        <div>
+          <label className="text-xs font-bold block mb-1">العملة</label>
+          <input value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl text-sm outline-none" />
+        </div>
+        <button className="bg-[#123B36] text-white px-5 py-2.5 rounded-xl text-xs font-bold">حفظ الإعدادات</button>
+      </form>
+    </div>
+  )
+}
