@@ -436,6 +436,7 @@ const SEED_RECIPES = [
 export function InventoryScreen({ items, ingredients, currency }) {
   const { data: recipes } = useLiveShared('recipes')
   const [subTab, setSubTab] = useState('ingredients')
+  const [search, setSearch] = useState('')
   const [name, setName] = useState('')
   const [val1, setVal1] = useState('')
   const [val2, setVal2] = useState('جم')
@@ -443,11 +444,27 @@ export function InventoryScreen({ items, ingredients, currency }) {
   const [recIng, setRecIng] = useState('')
   const [recQty, setRecQty] = useState('')
 
+  const [editIng, setEditIng] = useState(null)
+  const [editItem, setEditItem] = useState(null)
+  const [editRec, setEditRec] = useState(null)
+
   async function addIngredient(e) {
     e.preventDefault()
     if (!name) return
-    await db.insertShared('ingredients', { name, stock: Number(val1 || 0), unit: val2, cost: 0, minStock: 10 })
+    await db.insertShared('ingredients', { name, stock: Number(val1 || 0), unit: val2, cost: 0, minStock: 500 })
     setName(''); setVal1('')
+  }
+
+  async function saveEditIng(e) {
+    e.preventDefault()
+    if (!editIng) return
+    await db.updateShared('ingredients', editIng.id, {
+      name: editIng.name,
+      stock: Number(editIng.stock || 0),
+      unit: editIng.unit,
+      minStock: Number(editIng.minStock || 500),
+    })
+    setEditIng(null)
   }
 
   async function addItem(e) {
@@ -455,6 +472,17 @@ export function InventoryScreen({ items, ingredients, currency }) {
     if (!name) return
     await db.insertShared('items', { name, price: Number(val1 || 0), category: val2 || 'عام' })
     setName(''); setVal1('')
+  }
+
+  async function saveEditItem(e) {
+    e.preventDefault()
+    if (!editItem) return
+    await db.updateShared('items', editItem.id, {
+      name: editItem.name,
+      price: Number(editItem.price || 0),
+      category: editItem.category || 'عام',
+    })
+    setEditItem(null)
   }
 
   async function addRecipeLine(e) {
@@ -471,12 +499,23 @@ export function InventoryScreen({ items, ingredients, currency }) {
     setRecQty('')
   }
 
+  async function saveEditRecipe(e) {
+    e.preventDefault()
+    if (!editRec) return
+    const cleanLines = (editRec.lines || []).filter((l) => Number(l.qty) > 0)
+    await db.updateShared('recipes', editRec.id, { lines: cleanLines })
+    setEditRec(null)
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 bg-white p-2 rounded-2xl shadow-sm w-fit">
-        <button onClick={() => setSubTab('ingredients')} className={`px-4 py-2 rounded-xl text-xs font-bold ${subTab === 'ingredients' ? 'bg-[#123B36] text-white' : ''}`}>الجرد والخامات ({ingredients.length})</button>
-        <button onClick={() => setSubTab('items')} className={`px-4 py-2 rounded-xl text-xs font-bold ${subTab === 'items' ? 'bg-[#123B36] text-white' : ''}`}>أصناف المنيو ({items.length})</button>
-        <button onClick={() => setSubTab('recipes')} className={`px-4 py-2 rounded-xl text-xs font-bold ${subTab === 'recipes' ? 'bg-[#123B36] text-white' : ''}`}>الرسبي والوصفات ({recipes.length})</button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-2 bg-white p-2 rounded-2xl shadow-sm w-fit">
+          <button onClick={() => { setSubTab('ingredients'); setSearch('') }} className={`px-4 py-2 rounded-xl text-xs font-bold ${subTab === 'ingredients' ? 'bg-[#123B36] text-white' : ''}`}>الجرد والخامات ({ingredients.length})</button>
+          <button onClick={() => { setSubTab('items'); setSearch('') }} className={`px-4 py-2 rounded-xl text-xs font-bold ${subTab === 'items' ? 'bg-[#123B36] text-white' : ''}`}>أصناف المنيو ({items.length})</button>
+          <button onClick={() => { setSubTab('recipes'); setSearch('') }} className={`px-4 py-2 rounded-xl text-xs font-bold ${subTab === 'recipes' ? 'bg-[#123B36] text-white' : ''}`}>الرسبي والوصفات ({recipes.length})</button>
+        </div>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث سريع في القائمة..." className="bg-white px-4 py-2.5 rounded-2xl text-xs shadow-sm outline-none min-w-[220px]" />
       </div>
 
       {subTab === 'ingredients' && (
@@ -491,14 +530,34 @@ export function InventoryScreen({ items, ingredients, currency }) {
             </select>
             <button className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1"><Plus size={15} /> إضافة خامة</button>
           </form>
+
+          {editIng && (
+            <form onSubmit={saveEditIng} className="bg-amber-50 border border-amber-300 p-3 rounded-xl flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-extrabold text-amber-900">تعديل خامة:</span>
+              <input value={editIng.name} onChange={(e) => setEditIng({ ...editIng, name: e.target.value })} className="flex-1 min-w-[140px] bg-white px-2.5 py-1.5 rounded-lg border font-bold" />
+              <input type="number" step="any" value={editIng.stock} onChange={(e) => setEditIng({ ...editIng, stock: e.target.value })} placeholder="الرصيد" className="w-24 bg-white px-2.5 py-1.5 rounded-lg border font-bold" />
+              <select value={editIng.unit} onChange={(e) => setEditIng({ ...editIng, unit: e.target.value })} className="bg-white px-2.5 py-1.5 rounded-lg border font-bold">
+                <option value="جم">جم</option>
+                <option value="مل">مل</option>
+                <option value="حبة">حبة</option>
+              </select>
+              <input type="number" step="any" value={editIng.minStock || 500} onChange={(e) => setEditIng({ ...editIng, minStock: e.target.value })} placeholder="حد التنبيه" title="الحد الأدنى للتنبيه" className="w-24 bg-white px-2.5 py-1.5 rounded-lg border" />
+              <button type="submit" className="bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold">حفظ التعديل</button>
+              <button type="button" onClick={() => setEditIng(null)} className="bg-white px-3 py-1.5 rounded-lg border">إلغاء</button>
+            </form>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-[500px] overflow-y-auto">
-            {ingredients.map((ing) => (
+            {ingredients.filter((i) => !search || i.name.includes(search)).map((ing) => (
               <div key={ing.id} className="flex items-center justify-between bg-[#F4F1EA] p-3 rounded-xl text-xs">
                 <div>
                   <div className="font-bold">{ing.name}</div>
                   <div className="text-[#123B36]/60">الرصيد: <span className="font-extrabold text-[#123B36]">{ing.stock} {ing.unit}</span></div>
                 </div>
-                <button onClick={() => db.deleteShared('ingredients', ing.id)} className="text-red-500 p-1"><Trash2 size={15} /></button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setEditIng({ ...ing })} className="bg-white text-[#123B36] px-2.5 py-1 rounded-lg font-bold border border-[#123B36]/15">تعديل</button>
+                  <button onClick={() => db.deleteShared('ingredients', ing.id)} className="text-red-500 p-1"><Trash2 size={15} /></button>
+                </div>
               </div>
             ))}
           </div>
@@ -513,53 +572,25 @@ export function InventoryScreen({ items, ingredients, currency }) {
             <input value={val2} onChange={(e) => setVal2(e.target.value)} placeholder="الفئة (مثلاً: موهيتو)" className="w-36 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
             <button className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1"><Plus size={15} /> إضافة صنف</button>
           </form>
+
+          {editItem && (
+            <form onSubmit={saveEditItem} className="bg-amber-50 border border-amber-300 p-3 rounded-xl flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-extrabold text-amber-900">تعديل صنف:</span>
+              <input value={editItem.name} onChange={(e) => setEditItem({ ...editItem, name: e.target.value })} className="flex-1 min-w-[150px] bg-white px-2.5 py-1.5 rounded-lg border font-bold" />
+              <input type="number" step="0.001" value={editItem.price} onChange={(e) => setEditItem({ ...editItem, price: e.target.value })} className="w-24 bg-white px-2.5 py-1.5 rounded-lg border font-bold" />
+              <input value={editItem.category} onChange={(e) => setEditItem({ ...editItem, category: e.target.value })} className="w-32 bg-white px-2.5 py-1.5 rounded-lg border font-bold" />
+              <button type="submit" className="bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold">حفظ التعديل</button>
+              <button type="button" onClick={() => setEditItem(null)} className="bg-white px-3 py-1.5 rounded-lg border">إلغاء</button>
+            </form>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-[500px] overflow-y-auto">
-            {items.map((it) => (
+            {items.filter((i) => !search || i.name.includes(search) || (i.category || '').includes(search)).map((it) => (
               <div key={it.id} className="flex items-center justify-between bg-[#F4F1EA] p-3 rounded-xl text-xs">
                 <div>
                   <div className="font-bold">{it.name}</div>
                   <div className="text-[#123B36]/60">{it.category} • {fmt(it.price)} {currency}</div>
                 </div>
-                <button onClick={() => db.deleteShared('items', it.id)} className="text-red-500 p-1"><Trash2 size={15} /></button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {subTab === 'recipes' && (
-        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-4">
-          <form onSubmit={addRecipeLine} className="flex flex-wrap gap-2">
-            <select value={selectedItem} onChange={(e) => setSelectedItem(e.target.value)} className="flex-1 min-w-[160px] bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none">
-              <option value="">اختر الصنف من المنيو...</option>
-              {items.map((i) => <option key={i.id} value={i.name}>{i.name}</option>)}
-            </select>
-            <select value={recIng} onChange={(e) => setRecIng(e.target.value)} className="flex-1 min-w-[160px] bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none">
-              <option value="">اختر المادة الخام...</option>
-              {ingredients.map((ing) => <option key={ing.id} value={ing.name}>{ing.name} ({ing.unit})</option>)}
-            </select>
-            <input type="number" step="0.01" value={recQty} onChange={(e) => setRecQty(e.target.value)} placeholder="الكمية (جم/مل/حبة)" className="w-32 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
-            <button className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1"><BookOpen size={15} /> ربط بالرسبي</button>
-          </form>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto">
-            {recipes.map((r) => (
-              <div key={r.id} className="bg-[#F4F1EA] p-3 rounded-xl text-xs space-y-1">
-                <div className="flex justify-between font-extrabold text-[#123B36]">
-                  <span>{r.itemName}</span>
-                  <button onClick={() => db.deleteShared('recipes', r.id)} className="text-red-500"><Trash2 size={14} /></button>
-                </div>
-                <div className="text-[#123B36]/75 flex flex-wrap gap-1.5 pt-1">
-                  {(r.lines || []).map((l, idx) => (
-                    <span key={idx} className="bg-white px-2 py-0.5 rounded-lg border border-[#123B36]/10">{l.name}: {l.qty}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
 }
 
 export function SettingsScreen({ settings }) {
