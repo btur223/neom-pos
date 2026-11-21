@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Trash2, Send, AlertTriangle, Edit3, Sparkles, CheckCircle2, Receipt, BookOpen, Database, Calendar, TrendingUp, Users, RotateCcw } from 'lucide-react'
+import { Plus, Trash2, Send, AlertTriangle, Edit3, Sparkles, CheckCircle2, Receipt, BookOpen, Database, Calendar, TrendingUp, Users, RotateCcw, MessageCircle, Award, UserCheck, Star, Ticket, Store } from 'lucide-react'
 import { db } from './lib/db'
 import { useLiveShared } from './lib/useLive'
 import { share } from './lib/share'
@@ -353,14 +353,19 @@ const SEED_RECIPES = [
   { itemName: 'عصير تانك مانجو', lines: [{ name: 'عصير تانك مانجو', qty: 370 }, { name: 'سكر خشن', qty: 440 }] },
   { itemName: 'عصير فيمتو', lines: [{ name: 'فيمتو', qty: 500 }, { name: 'سكر خشن', qty: 440 }] },
   ]
-  export function DashboardScreen({ invoices, ingredients, recipes, settings }) {
+)
+export function DashboardScreen({ invoices, ingredients, recipes, settings, features = {}, currentBranch = 'الفرع الرئيسي - صلالة' }) {
   const { data: expenses } = useLiveShared('expenses', { order: '-createdAt', limit: 200 })
   const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 200 })
   const { data: items } = useLiveShared('items')
+  const { data: customers } = useLiveShared('customers')
+  const { data: feedbacks } = useLiveShared('feedbacks', { order: '-created_at', limit: 50 })
   const [expTitle, setExpTitle] = useState('')
   const [expAmount, setExpAmount] = useState('')
   const [period, setPeriod] = useState('today')
+  const [branchFilter, setBranchFilter] = useState('all')
   const currency = settings?.currency || 'ر.ع'
+  const branchesList = settings?.branches || ['الفرع الرئيسي - صلالة']
 
   const today = todayStr()
 
@@ -375,11 +380,20 @@ const SEED_RECIPES = [
     return true
   }
 
-  const periodInvoices = useMemo(() => invoices.filter((i) => isInPeriod(i.date)), [invoices, period, today])
-  const periodExpenses = useMemo(() => expenses.filter((e) => isInPeriod(e.date)), [expenses, period, today])
+  const matchBranch = (recBranch) => {
+    if (!features.branches || branchFilter === 'all') return true
+    return (recBranch || branchesList) === branchFilter
+  }
+
+  const periodInvoices = useMemo(() => invoices.filter((i) => isInPeriod(i.date) && matchBranch(i.branch)), [invoices, period, today, branchFilter, features.branches])
+  const periodExpenses = useMemo(() => expenses.filter((e) => isInPeriod(e.date) && matchBranch(e.branch)), [expenses, period, today, branchFilter, features.branches])
   const periodWasteLogs = useMemo(() => (wasteLogs || []).filter((w) => isInPeriod(w.date)), [wasteLogs, period, today])
 
   const totalSales = periodInvoices.reduce((s, i) => s + Number(i.total || 0), 0)
+  const cashTotal = periodInvoices.filter((i) => i.paymentMethod === 'نقدي').reduce((s, i) => s + Number(i.total || 0), 0)
+  const cardTotal = periodInvoices.filter((i) => i.paymentMethod === 'بطاقة').reduce((s, i) => s + Number(i.total || 0), 0)
+  const transferTotal = periodInvoices.filter((i) => i.paymentMethod === 'تحويل').reduce((s, i) => s + Number(i.total || 0), 0)
+
   const totalExpenses = periodExpenses.reduce((s, e) => s + Number(e.amount || 0), 0)
   const totalWaste = periodWasteLogs.reduce((s, w) => s + Number(w.cost_loss || 0), 0)
   const lowStock = ingredients.filter((ing) => Number(ing.stock || 0) <= Number(ing.minStock || 0))
@@ -420,6 +434,21 @@ const SEED_RECIPES = [
     return Object.values(counts).sort((a, b) => b.qty - a.qty).slice(0, 5)
   }, [periodInvoices])
 
+  const staffPerformance = useMemo(() => {
+    const map = {}
+    periodInvoices.forEach((inv) => {
+      const name = inv.cashierName || 'غير محدد'
+      if (!map[name]) map[name] = { name, count: 0, total: 0 }
+      map[name].count += 1
+      map[name].total += Number(inv.total || 0)
+    })
+    return Object.values(map).sort((a, b) => b.total - a.total)
+  }, [periodInvoices])
+
+  const vipCustomers = useMemo(() => {
+    return [...(customers || [])].sort((a, b) => Number(b.total_spent || 0) - Number(a.total_spent || 0))
+  }, [customers])
+
   const itemProfitList = useMemo(() => {
     return (items || []).map((it) => {
       const cost = recipeCostMap[it.name] || 0
@@ -433,7 +462,7 @@ const SEED_RECIPES = [
   async function addExpense(e) {
     e.preventDefault()
     if (!expTitle || !expAmount) return
-    await db.insertShared('expenses', { title: expTitle, amount: Number(expAmount), date: today })
+    await db.insertShared('expenses', { title: expTitle, amount: Number(expAmount), date: today, branch: branchFilter !== 'all' ? branchFilter : currentBranch })
     setExpTitle('')
     setExpAmount('')
   }
@@ -456,26 +485,48 @@ const SEED_RECIPES = [
 
   const periodLabels = { today: 'اليوم', week: 'آخر 7 أيام', month: 'هذا الشهر', all: 'الإجمالي الكلي' }
 
+  function sendOwnerWhatsAppReport() {
+    const branchTitle = features.branches ? (branchFilter === 'all' ? 'جميع الفروع' : branchFilter) : ''
+    const topTxt = topSelling.length > 0 ? topSelling.slice(0, 3).map((x, i) => `${i + 1}. ${x.name} (${x.qty})`).join('\n') : 'لا يوجد'
+    const msg = `📊 *تقرير المالك - مقهى ${settings?.shopName || 'نيوم'}*\n${branchTitle ? `الفرع: *${branchTitle}*\n` : ''}الفترة: *${periodLabels[period]}* (${today})\n\n💰 *المبيعات (${periodInvoices.length} فاتورة):* ${fmt(totalSales)} ${currency}\n• نقدي: ${fmt(cashTotal)} ${currency}\n• بطاقة: ${fmt(cardTotal)} ${currency}\n• تحويل: ${fmt(transferTotal)} ${currency}\n\n📉 *التكاليف والمصروفات:*\n• تكلفة الخامات (الرسبي): ${fmt(totalCogs)} ${currency}\n• المصروفات: ${fmt(totalExpenses)} ${currency}\n• الهالك والعجز: ${fmt(totalWaste)} ${currency}\n\n✅ *صافي الربح الحقيقي: ${fmt(netProfit)} ${currency}*\n\n🔥 *الأكثر مبيعاً:*\n${topTxt}`
+    window.open('https://wa.me' + encodeURIComponent(msg), '_blank')
+  }
+
+  function sendLowStockWhatsApp() {
+    const listTxt = lowStock.map((ing, i) => `${i + 1}. ${ing.name} (المتبقي: ${ing.stock} ${ing.unit})`).join('\n')
+    const msg = `📦 *طلب نواقص مخزون - مقهى ${settings?.shopName || 'نيوم'}*\nالتاريخ: ${today}\n\nالمواد المطلوبة:\n${listTxt}`
+    window.open('https://wa.me' + encodeURIComponent(msg), '_blank')
+  }
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-3 rounded-2xl shadow-sm border border-[#123B36]/10">
-        <div className="flex items-center gap-2 font-extrabold text-xs text-[#123B36]">
-          <Calendar size={16} />
-          <span>عرض التقارير والأرباح حسب الفترة:</span>
-        </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 font-extrabold text-xs text-[#123B36]"><Calendar size={16} /> الفترة:</span>
           {Object.entries(periodLabels).map(([key, label]) => (
-            <button key={key} onClick={() => setPeriod(key)} className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition ${period === key ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA] text-[#123B36]/75'}`}>
+            <button key={key} onClick={() => setPeriod(key)} className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${period === key ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA] text-[#123B36]/75'}`}>
               {label}
             </button>
           ))}
+          {features.branches && (
+            <div className="flex items-center gap-1.5 mr-2 border-r pr-2 border-[#123B36]/15">
+              <Store size={15} className="text-[#123B36]" />
+              <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="bg-[#F4F1EA] px-2.5 py-1.5 rounded-xl text-xs font-extrabold text-[#123B36] outline-none">
+                <option value="all">جميع الفروع ({branchesList.length})</option>
+                {branchesList.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+          )}
         </div>
+        <button onClick={sendOwnerWhatsAppReport} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm">
+          <MessageCircle size={15} /> إرسال تقرير المالك واتساب
+        </button>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10">
           <div className="text-xs text-[#123B36]/60 font-bold">مبيعات {periodLabels[period]} ({periodInvoices.length})</div>
           <div className="text-xl font-extrabold text-[#123B36] mt-1">{fmt(totalSales)} {currency}</div>
+          <div className="text-[10px] text-[#123B36]/60 mt-1 font-bold">كاش: {fmt(cashTotal)} • بطاقة: {fmt(cardTotal)}</div>
         </div>
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10">
           <div className="text-xs text-[#123B36]/60 font-bold">تكلفة الخامات (الرسبي)</div>
@@ -496,10 +547,15 @@ const SEED_RECIPES = [
       </div>
 
       {lowStock.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl">
-          <div className="flex items-center gap-2 font-extrabold text-amber-900 text-sm mb-2">
-            <AlertTriangle size={18} />
-            <span>تنبيه نواقص المخزون ({lowStock.length})</span>
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 font-extrabold text-amber-900 text-sm">
+              <AlertTriangle size={18} />
+              <span>تنبيه نواقص المخزون ({lowStock.length})</span>
+            </div>
+            <button onClick={sendLowStockWhatsApp} className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1">
+              <MessageCircle size={14} /> طلب النواقص واتساب
+            </button>
           </div>
           <div className="flex flex-wrap gap-2">
             {lowStock.map((ing) => (
@@ -511,13 +567,13 @@ const SEED_RECIPES = [
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className={`grid grid-cols-1 ${features.analytics !== false ? 'lg:grid-cols-3' : ''} gap-4`}>
         <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
           <h3 className="font-extrabold text-sm flex items-center gap-2"><Receipt size={16} /> تسجيل مصروف يومي</h3>
           <form onSubmit={addExpense} className="flex gap-2">
-            <input value={expTitle} onChange={(e) => setExpTitle(e.target.value)} placeholder="بيان المصروف (ثلج، كهرباء...)" className="flex-1 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
-            <input type="number" step="0.001" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} placeholder="المبلغ" className="w-28 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
-            <button className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">إضافة</button>
+            <input value={expTitle} onChange={(e) => setExpTitle(e.target.value)} placeholder="بيان المصروف..." className="flex-1 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
+            <input type="number" step="0.001" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} placeholder="المبلغ" className="w-24 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
+            <button className="bg-[#123B36] text-white px-3 py-2 rounded-xl text-xs font-bold">إضافة</button>
           </form>
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {periodExpenses.map((e) => (
@@ -532,52 +588,172 @@ const SEED_RECIPES = [
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
-          <h3 className="font-extrabold text-sm flex items-center gap-2"><TrendingUp size={16} /> الأصناف الأكثر مبيعاً ({periodLabels[period]})</h3>
-          {topSelling.length === 0 ? (
-            <p className="text-xs text-[#123B36]/50 py-6 text-center">لا توجد مبيعات مسجلة في هذه الفترة.</p>
-          ) : (
-            <div className="space-y-2 text-xs">
-              {topSelling.map((item, idx) => (
-                <div key={item.name} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2.5 rounded-xl">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-6 h-6 rounded-lg bg-[#123B36] text-white font-extrabold flex items-center justify-center text-[11px]">{idx + 1}</span>
-                    <span className="font-extrabold">{item.name}</span>
-                  </div>
-                  <div className="text-left">
-                    <span className="font-extrabold text-emerald-800">{item.qty} كوب/قطعة</span>
-                    <span className="text-[11px] text-[#123B36]/60 mr-2">({fmt(item.revenue)} {currency})</span>
-                  </div>
+        {features.analytics !== false && (
+          <>
+            <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+              <h3 className="font-extrabold text-sm flex items-center gap-2"><TrendingUp size={16} /> الأصناف الأكثر مبيعاً</h3>
+              {topSelling.length === 0 ? (
+                <p className="text-xs text-[#123B36]/50 py-6 text-center">لا توجد مبيعات في هذه الفترة.</p>
+              ) : (
+                <div className="space-y-2 text-xs">
+                  {topSelling.map((item, idx) => (
+                    <div key={item.name} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-lg bg-[#123B36] text-white font-extrabold flex items-center justify-center text-[10px]">{idx + 1}</span>
+                        <span className="font-extrabold">{item.name}</span>
+                      </div>
+                      <div>
+                        <span className="font-extrabold text-emerald-800">{item.qty}</span>
+                        <span className="text-[10px] text-[#123B36]/60 mr-1">({fmt(item.revenue)})</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
-          <h3 className="font-extrabold text-sm flex items-center gap-2"><RotateCcw size={16} /> سجل فواتير {periodLabels[period]} ({periodInvoices.length})</h3>
-          <div className="max-h-60 overflow-y-auto space-y-1.5 text-xs">
-            {periodInvoices.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2.5 rounded-xl">
-                <div>
-                  <div className="font-extrabold">{inv.number} • {inv.paymentMethod} <span className="text-[10px] text-[#123B36]/60">({inv.cashierName || ''})</span></div>
-                  <div className="text-[11px] text-[#123B36]/70">{(inv.lines || []).map((l) => `${l.name}×${l.qty}`).join('، ')}</div>
-                  {inv.note && <div className="text-[10px] text-amber-700 font-bold">ملاحظة: {inv.note}</div>}
+            <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+              <h3 className="font-extrabold text-sm flex items-center gap-2"><UserCheck size={16} /> أداء الموظفين والكاشير</h3>
+              {staffPerformance.length === 0 ? (
+                <p className="text-xs text-[#123B36]/50 py-6 text-center">لا توجد مبيعات مسجلة للموظفين.</p>
+              ) : (
+                <div className="space-y-2 text-xs">
+                  {staffPerformance.map((st) => (
+                    <div key={st.name} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2.5 rounded-xl">
+                      <div>
+                        <div className="font-extrabold">{st.name}</div>
+                        <div className="text-[10px] text-[#123B36]/60">{st.count} فاتورة</div>
+                      </div>
+                      <span className="font-extrabold text-[#123B36]">{fmt(st.total)} {currency}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-[#123B36]">{fmt(inv.total)} {currency}</span>
-                  <button onClick={() => cancelAndRestockInvoice(inv)} title="إلغاء الفاتورة وإرجاع المخزون" className="bg-red-100 text-red-700 px-2 py-1 rounded-lg font-bold text-[10px] hover:bg-red-200">إلغاء</button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+      <div className="bg-white p-5 rounded-2xl shadow-sm space-y-4 border border-[#123B36]/10">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+          <h3 className="font-extrabold text-base flex items-center gap-2 text-[#123B36]">
+            <RotateCcw size={18} /> سجل وتحكم المالك بالفواتير ({periodLabels[period]}: {periodInvoices.length} فاتورة)
+          </h3>
+          <span className="text-xs font-extrabold bg-emerald-50 text-emerald-900 px-3 py-1.5 rounded-xl">
+            إجمالي الفترة: {fmt(totalSales)} {currency}
+          </span>
+        </div>
+
+        {periodInvoices.length === 0 ? (
+          <p className="text-center text-sm text-[#123B36]/50 py-8">لا توجد فواتير مسجلة في هذه الفترة.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto">
+            {periodInvoices.map((inv) => (
+              <div key={inv.id} className="bg-[#F4F1EA] p-4 rounded-2xl border border-[#123B36]/15 space-y-2.5">
+                <div className="flex items-center justify-between border-b border-[#123B36]/10 pb-2">
+                  <div>
+                    <span className="font-extrabold text-base text-[#123B36]">فاتورة {inv.number}</span>
+                    <span className="text-xs text-[#123B36]/70 mr-2">({inv.date})</span>
+                    {features.branches && inv.branch && <span className="text-[10px] bg-white px-2 py-0.5 rounded-md font-bold mr-1">{inv.branch}</span>}
+                  </div>
+                  <span className="font-extrabold text-lg text-emerald-800">{fmt(inv.total)} {currency}</span>
+                </div>
+
+                <div className="space-y-1 text-xs font-bold text-[#123B36] bg-white/70 p-2.5 rounded-xl">
+                  {(inv.lines || []).map((l, idx) => (
+                    <div key={idx} className="flex justify-between">
+                      <span>• {l.name} × {l.qty}</span>
+                      <span>{fmt(Number(l.price || 0) * Number(l.qty || 1))} {currency}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {inv.note && (
+                  <div className="text-xs text-amber-900 bg-amber-100 px-2.5 py-1 rounded-lg font-bold">
+                    ملاحظة: {inv.note}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[#123B36]/70 font-bold">الدفع:</span>
+                    <select
+                      value={inv.paymentMethod || 'نقدي'}
+                      onChange={(e) => db.updateShared('invoices', inv.id, { paymentMethod: e.target.value })}
+                      className="bg-white border border-[#123B36]/20 rounded-lg px-2 py-1 text-xs font-extrabold text-[#123B36] outline-none"
+                    >
+                      <option value="نقدي">نقدي</option>
+                      <option value="بطاقة">بطاقة</option>
+                      <option value="تحويل">تحويل</option>
+                    </select>
+                    <span className="text-[11px] text-[#123B36]/60 mr-1">• {inv.cashierName || 'المالك'}</span>
+                  </div>
+
+                  <button
+                    onClick={() => cancelAndRestockInvoice(inv)}
+                    className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-red-700"
+                  >
+                    حذف وإرجاع المخزون
+                  </button>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        )}
+      </div>
 
-        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {features.loyalty !== false && (
+          <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+            <h3 className="font-extrabold text-sm flex items-center gap-2"><Award size={16} className="text-amber-600" /> قاعدة بيانات العملاء المميزين VIP ({vipCustomers.length})</h3>
+            {vipCustomers.length === 0 ? (
+              <p className="text-xs text-[#123B36]/50 py-6 text-center">سيظهر هنا العملاء تلقائياً عند إدخال رقم جوالهم في الكاشير.</p>
+            ) : (
+              <div className="max-h-60 overflow-y-auto space-y-2 text-xs">
+                {vipCustomers.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2.5 rounded-xl">
+                    <div>
+                      <div className="font-extrabold">{c.phone}</div>
+                      <div className="text-[11px] text-[#123B36]/70">الزيارات: {c.visits || 1} • النقاط: {c.points || 0} ⭐ • الإنفاق: {fmt(c.total_spent)} {currency}</div>
+                    </div>
+                    <a
+                      href={`https://wa.me{String(c.phone).startsWith('968') ? c.phone : '968' + c.phone}?text=${encodeURIComponent(`مرحباً عميلنا المميز في مقهى ${settings?.shopName || 'نيوم'} ☕ لديك رصيد ${c.points || 0} نقطة ولاء!`)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1"
+                    >
+                      <MessageCircle size={13} /> واتساب
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {features.feedback !== false && (
+          <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+            <h3 className="font-extrabold text-sm flex items-center gap-2"><Star size={16} className="text-amber-500" /> تقييمات وآراء الزبائن ({(feedbacks || []).length})</h3>
+            {(feedbacks || []).length === 0 ? (
+              <p className="text-xs text-[#123B36]/50 py-6 text-center">ستظهر هنا تقييمات الزبائن بعد الطلب من الباركود.</p>
+            ) : (
+              <div className="max-h-60 overflow-y-auto space-y-2 text-xs">
+                {(feedbacks || []).map((fb) => (
+                  <div key={fb.id} className="bg-[#F4F1EA] px-3 py-2.5 rounded-xl flex justify-between items-center">
+                    <div>
+                      <div className="font-extrabold text-amber-600">{'⭐'.repeat(fb.rating || 5)} {fb.table_num ? <span className="text-[#123B36] mr-1">(طاولة {fb.table_num})</span> : ''}</div>
+                      {fb.comment && <div className="text-[#123B36]/80 mt-0.5">{fb.comment}</div>}
+                    </div>
+                    <button onClick={() => db.deleteShared('feedbacks', fb.id)} className="text-red-500 p-1"><Trash2 size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3 lg:col-span-2">
           <h3 className="font-extrabold text-sm flex items-center gap-2"><BookOpen size={16} /> تكلفة الأصناف وهامش الربح (حسب الرسبي)</h3>
-          <div className="max-h-60 overflow-y-auto space-y-1.5 text-xs">
+          <div className="max-h-60 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
             {itemProfitList.map((it) => (
               <div key={it.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2 rounded-xl">
                 <div>
@@ -595,6 +771,7 @@ const SEED_RECIPES = [
       </div>
     </div>
   )
+}
 }
 export function InventoryScreen({ items, ingredients, recipes = [], currency }) {
   const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 100 })
@@ -949,10 +1126,82 @@ export function SettingsScreen({ settings }) {
   const [seeding, setSeeding] = useState(false)
   const [seedDone, setSeedDone] = useState(false)
 
+  const defaultFeatures = { branches: true, barista: true, loyalty: true, qrMenu: true, holdDiscount: true, shifts: true, expiryCredit: true, analytics: true, quickCash: true, feedback: true, coupons: true }
+  const [features, setFeatures] = useState(() => ({ ...defaultFeatures, ...(settings?.features || {}) }))
+
+  const [branches, setBranches] = useState(() => settings?.branches || ['الفرع الرئيسي - صلالة'])
+  const [newBranchName, setNewBranchName] = useState('')
+
+  const [coupons, setCoupons] = useState(() => settings?.coupons || [])
+  const [cCode, setCCode] = useState('')
+  const [cType, setCType] = useState('percent')
+  const [cVal, setCVal] = useState('')
+
   const [staff, setStaff] = useState(() => getStaffList())
   const [newStaffName, setNewStaffName] = useState('')
   const [newStaffPin, setNewStaffPin] = useState('')
   const [newStaffRole, setNewStaffRole] = useState('cashier')
+
+  async function syncSettingsPayload(nextFeatures, nextCoupons, nextBranches) {
+    const payload = { features: nextFeatures, coupons: nextCoupons, branches: nextBranches }
+    if (settings?.id && settings.id !== 'main') {
+      await db.updateShared('settings', settings.id, payload)
+    } else {
+      await db.insertShared('settings', { shopName, currency, ...payload })
+    }
+  }
+
+  async function toggleFeature(key) {
+    const next = { ...features, [key]: !features[key] }
+    setFeatures(next)
+    await syncSettingsPayload(next, coupons, branches)
+  }
+
+  async function handleAddBranch(e) {
+    e.preventDefault()
+    if (!newBranchName.trim()) return
+    const next = [...branches, newBranchName.trim()]
+    setBranches(next)
+    setNewBranchName('')
+    await syncSettingsPayload(features, coupons, next)
+  }
+
+  async function handleDeleteBranch(bName) {
+    if (branches.length <= 1) return alert('يجب بقاء فرع واحد على الأقل في النظام!')
+    if (!confirm(`هل تريد إغلاق وحذف "${bName}" من قائمة الفروع النشطة؟ (ستبقى فواتيره السابقة محفوظة في الأرشيف)`)) return
+    const next = branches.filter((b) => b !== bName)
+    setBranches(next)
+    await syncSettingsPayload(features, coupons, next)
+  }
+
+  async function handleAddCoupon(e) {
+    e.preventDefault()
+    if (!cCode.trim() || !cVal) return
+    const next = [...coupons, { id: Date.now(), code: cCode.trim().toUpperCase(), type: cType, value: Number(cVal), active: true }]
+    setCoupons(next)
+    setCCode(''); setCVal('')
+    await syncSettingsPayload(features, next, branches)
+  }
+
+  async function handleDeleteCoupon(id) {
+    const next = coupons.filter((c) => c.id !== id)
+    setCoupons(next)
+    await syncSettingsPayload(features, next, branches)
+  }
+
+  const featureLabels = [
+    { key: 'branches', title: 'إدارة الفروع المتعددة (Multi-Branch)', desc: 'إضافة فروع جديدة أو إغلاق فرع قديم وفلترة الأرباح حسب كل فرع' },
+    { key: 'quickCash', title: 'حاسبة الباقي السريعة (1، 5، 10، 20 ر.ع)', desc: 'أزرار فئات الريال العماني لحساب المتبقي للزبون عند الدفع نقداً' },
+    { key: 'coupons', title: 'كوبونات الخصم الترويجية (Promo Codes)', desc: 'إنشاء أكواد خصم للمواسم والمؤثرين وتطبيقها في الكاشير' },
+    { key: 'barista', title: 'شاشة تحضير الباريستا المباشرة (KDS)', desc: 'تبويب خاص لعرض الطلبات للباريستا مع زر تم التحضير' },
+    { key: 'loyalty', title: 'نظام نقاط الولاء وعملاء VIP', desc: 'تجميع نقاط العملاء في الكاشير وعرض قائمتهم في لوحة المالك' },
+    { key: 'qrMenu', title: 'منيو الباركود وطلبات الطاولات (QR)', desc: 'زر إنشاء باركود الطاولات واستقبال طلبات الزبائن مباشرة' },
+    { key: 'feedback', title: 'تقييمات الزبائن السريعة (⭐⭐⭐⭐⭐)', desc: 'نموذج تقييم يظهر للزبون بعد الطلب من الباركود ويصل للوحة المالك' },
+    { key: 'holdDiscount', title: 'تعليق الطلبات والخصم اليدوي والملاحظات', desc: 'أزرار تعليق الفاتورة وعمل خصم يدوي وملاحظات التحضير' },
+    { key: 'shifts', title: 'نظام الورديات ومطابقة الصندوق', desc: 'زر فتح وإغلاق الوردية ومطابقة الكاش في الدرج' },
+    { key: 'expiryCredit', title: 'البيع الآجل للموردين وتنبيهات الصلاحية', desc: 'تسجيل فواتير الموردين الآجلة وتاريخ انتهاء صلاحية الخامات' },
+    { key: 'analytics', title: 'تحليلات المالك المتقدمة', desc: 'بطاقات الأصناف الأكثر مبيعاً وأداء الموظفين في الشاشة الرئيسية' },
+  ]
 
   function handleAddStaff(e) {
     e.preventDefault()
@@ -973,9 +1222,9 @@ export function SettingsScreen({ settings }) {
   async function saveSettings(e) {
     e.preventDefault()
     if (settings?.id && settings.id !== 'main') {
-      await db.updateShared('settings', settings.id, { shopName, currency })
+      await db.updateShared('settings', settings.id, { shopName, currency, features, coupons, branches })
     } else {
-      await db.insertShared('settings', { shopName, currency })
+      await db.insertShared('settings', { shopName, currency, features, coupons, branches })
     }
     alert('تم حفظ الإعدادات بنجاح')
   }
@@ -1008,31 +1257,75 @@ export function SettingsScreen({ settings }) {
       setSeeding(false)
     }
   }
-
   return (
-    <div className="max-w-xl mx-auto space-y-4">
-      <div className="bg-gradient-to-l from-[#123B36] to-[#1e574f] text-white p-5 rounded-2xl shadow-md space-y-3">
-        <div className="flex items-center gap-2 font-extrabold text-base">
-          <Sparkles size={20} className="text-amber-300" />
-          <span>تعبئة المنيو والجرد والرسبي الكامل</span>
+    <div className="max-w-2xl mx-auto space-y-4">
+      <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
+        <h3 className="font-extrabold text-base text-[#123B36]">🎛️ التحكم بمميزات النظام (تشغيل / إيقاف حسب الحاجة)</h3>
+        <p className="text-xs text-[#123B36]/65">فعّل المميزات التي تحتاجها حالياً وأوقف الباقي لتبسيط الواجهة، ويمكنك تشغيلها بضغطة زر في أي وقت مستقبلاً.</p>
+        <div className="space-y-2">
+          {featureLabels.map((item) => (
+            <div key={item.key} onClick={() => toggleFeature(item.key)} className="flex items-center justify-between gap-3 bg-[#F4F1EA] p-3.5 rounded-xl cursor-pointer hover:border-[#123B36]/30 border border-transparent transition">
+              <div>
+                <div className="font-extrabold text-xs text-[#123B36]">{item.title}</div>
+                <div className="text-[11px] text-[#123B36]/60 mt-0.5">{item.desc}</div>
+              </div>
+              <button type="button" className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition shrink-0 ${features[item.key] ? 'bg-emerald-600 text-white' : 'bg-gray-300 text-gray-700'}`}>
+                {features[item.key] ? 'مُفعّل ✓' : 'مُعطّل'}
+              </button>
+            </div>
+          ))}
         </div>
-        <p className="text-xs text-white/80 leading-relaxed">
-          اضغط على الزر بالأسفل لإدخال كافة أصناف المنيو (111 صنفًا) والمواد الخام النظيفة ومقادير الرسبي دفعة واحدة، وسيقوم النظام بتوليد الأكواد وربط الخصم التلقائي للمخزون.
-        </p>
-        <button
-          onClick={importFullData}
-          disabled={seeding}
-          className="w-full bg-amber-400 hover:bg-amber-300 text-[#123B36] font-extrabold py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition"
-        >
-          <Database size={18} />
-          {seeding ? 'جاري استيراد البيانات وربط الرسبي...' : seedDone ? 'تم الاستيراد بنجاح! اضغط لتحديث النواقص' : 'استيراد المنيو والجرد والرسبي الآن'}
-        </button>
-        {seedDone && (
-          <div className="flex items-center gap-2 text-xs text-emerald-200 font-bold">
-            <CheckCircle2 size={16} /> تم زرع جميع البيانات بنجاح! انتقل إلى "الكاشير" أو "المخزن والوصفات".
-          </div>
-        )}
       </div>
+
+      {features.branches && (
+        <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
+          <h3 className="font-extrabold text-sm flex items-center gap-2"><Store size={16} /> إدارة الفروع (افتتاح فرع جديد أو إغلاق فرع)</h3>
+          <form onSubmit={handleAddBranch} className="flex gap-2">
+            <input value={newBranchName} onChange={(e) => setNewBranchName(e.target.value)} placeholder="اسم الفرع الجديد (مثلاً: فرع السعادة - صلالة)..." required className="flex-1 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none font-bold" />
+            <button type="submit" className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">إضافة فرع</button>
+          </form>
+          <div className="space-y-1.5 text-xs">
+            {branches.map((b, idx) => (
+              <div key={b} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2.5 rounded-xl">
+                <div className="font-extrabold">{idx + 1}. {b}</div>
+                {branches.length > 1 && (
+                  <button onClick={() => handleDeleteBranch(b)} className="bg-red-100 text-red-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">إغلاق الفرع</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {features.coupons && (
+        <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
+          <h3 className="font-extrabold text-sm flex items-center gap-2"><Ticket size={16} /> إدارة كوبونات الخصم الترويجية</h3>
+          <form onSubmit={handleAddCoupon} className="flex flex-wrap gap-2">
+            <input value={cCode} onChange={(e) => setCCode(e.target.value)} placeholder="الكود (مثلاً: KHAREF)" required className="flex-1 min-w-[120px] bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none font-extrabold uppercase" />
+            <select value={cType} onChange={(e) => setCType(e.target.value)} className="bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold outline-none">
+              <option value="percent">نسبة مئوية (%)</option>
+              <option value="fixed">مبلغ ثابت ({currency})</option>
+            </select>
+            <input type="number" step="any" value={cVal} onChange={(e) => setCVal(e.target.value)} placeholder="القيمة" required className="w-24 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none font-bold" />
+            <button type="submit" className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">إضافة</button>
+          </form>
+          {coupons.length > 0 && (
+            <div className="space-y-1.5 text-xs">
+              {coupons.map((cp) => (
+                <div key={cp.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2 rounded-xl">
+                  <div>
+                    <span className="font-extrabold text-amber-800">{cp.code}</span>
+                    <span className="text-[11px] text-[#123B36]/70 mr-2">
+                      (خصم {cp.type === 'percent' ? `${cp.value}%` : `${fmt(cp.value)} ${currency}`})
+                    </span>
+                  </div>
+                  <button onClick={() => handleDeleteCoupon(cp.id)} className="text-red-500 p-1"><Trash2 size={14} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
         <h3 className="font-extrabold text-sm flex items-center gap-2"><Users size={16} /> إدارة حسابات الموظفين والكاشير</h3>
@@ -1056,6 +1349,29 @@ export function SettingsScreen({ settings }) {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="bg-gradient-to-l from-[#123B36] to-[#1e574f] text-white p-5 rounded-2xl shadow-md space-y-3">
+        <div className="flex items-center gap-2 font-extrabold text-base">
+          <Sparkles size={20} className="text-amber-300" />
+          <span>تعبئة المنيو والجرد والرسبي الكامل</span>
+        </div>
+        <p className="text-xs text-white/80 leading-relaxed">
+          اضغط على الزر بالأسفل لإدخال كافة أصناف المنيو (111 صنفًا) والمواد الخام النظيفة ومقادير الرسبي دفعة واحدة، وسيقوم النظام بتوليد الأكواد وربط الخصم التلقائي للمخزون.
+        </p>
+        <button
+          onClick={importFullData}
+          disabled={seeding}
+          className="w-full bg-amber-400 hover:bg-amber-300 text-[#123B36] font-extrabold py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition"
+        >
+          <Database size={18} />
+          {seeding ? 'جاري استيراد البيانات وربط الرسبي...' : seedDone ? 'تم الاستيراد بنجاح! اضغط لتحديث النواقص' : 'استيراد المنيو والجرد والرسبي الآن'}
+        </button>
+        {seedDone && (
+          <div className="flex items-center gap-2 text-xs text-emerald-200 font-bold">
+            <CheckCircle2 size={16} /> تم زرع جميع البيانات بنجاح! انتقل إلى "الكاشير" أو "المخزن والوصفات".
+          </div>
+        )}
       </div>
 
       <form onSubmit={saveSettings} className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
