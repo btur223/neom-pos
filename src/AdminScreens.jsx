@@ -355,6 +355,8 @@ const SEED_RECIPES = [
   ]
   export function DashboardScreen({ invoices, ingredients, recipes, settings }) {
   const { data: expenses } = useLiveShared('expenses', { order: '-createdAt', limit: 100 })
+  const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 200 })
+  const { data: items } = useLiveShared('items')
   const [expTitle, setExpTitle] = useState('')
   const [expAmount, setExpAmount] = useState('')
   const currency = settings?.currency || 'ر.ع'
@@ -363,7 +365,42 @@ const SEED_RECIPES = [
   const todayInvoices = invoices.filter((i) => i.date === today)
   const todaySales = todayInvoices.reduce((s, i) => s + Number(i.total || 0), 0)
   const todayExpenses = expenses.filter((e) => e.date === today).reduce((s, e) => s + Number(e.amount || 0), 0)
+  const todayWaste = (wasteLogs || []).filter((w) => w.date === today).reduce((s, w) => s + Number(w.cost_loss || 0), 0)
   const lowStock = ingredients.filter((ing) => Number(ing.stock || 0) <= Number(ing.minStock || 0))
+
+  const ingCostMap = useMemo(() => {
+    const m = {}
+    ingredients.forEach((ing) => { m[ing.name] = Number(ing.cost || 0) })
+    return m
+  }, [ingredients])
+
+  const recipeCostMap = useMemo(() => {
+    const m = {}
+    recipes.forEach((rec) => {
+      const c = (rec.lines || []).reduce((sum, l) => sum + (Number(l.qty || 0) * (ingCostMap[l.name] || 0)), 0)
+      m[rec.itemName] = c
+    })
+    return m
+  }, [recipes, ingCostMap])
+
+  const todayCogs = useMemo(() => {
+    return todayInvoices.reduce((sum, inv) => {
+      const invCost = (inv.lines || []).reduce((s, l) => s + ((recipeCostMap[l.name] || 0) * Number(l.qty || 1)), 0)
+      return sum + invCost
+    }, 0)
+  }, [todayInvoices, recipeCostMap])
+
+  const netProfit = todaySales - todayCogs - todayExpenses - todayWaste
+
+  const itemProfitList = useMemo(() => {
+    return (items || []).map((it) => {
+      const cost = recipeCostMap[it.name] || 0
+      const price = Number(it.price || 0)
+      const profit = price - cost
+      const margin = price > 0 ? Math.round((profit / price) * 100) : 0
+      return { ...it, cost, profit, margin }
+    }).sort((a, b) => a.margin - b.margin)
+  }, [items, recipeCostMap])
 
   async function addExpense(e) {
     e.preventDefault()
@@ -375,18 +412,26 @@ const SEED_RECIPES = [
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10">
-          <div className="text-xs text-[#123B36]/60 font-bold">مبيعات اليوم ({todayInvoices.length} فاتورة)</div>
-          <div className="text-2xl font-extrabold text-[#123B36] mt-1">{fmt(todaySales)} {currency}</div>
+          <div className="text-xs text-[#123B36]/60 font-bold">مبيعات اليوم ({todayInvoices.length})</div>
+          <div className="text-xl font-extrabold text-[#123B36] mt-1">{fmt(todaySales)} {currency}</div>
+        </div>
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10">
+          <div className="text-xs text-[#123B36]/60 font-bold">تكلفة الخامات (الرسبي)</div>
+          <div className="text-xl font-extrabold text-amber-700 mt-1">{fmt(todayCogs)} {currency}</div>
         </div>
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10">
           <div className="text-xs text-[#123B36]/60 font-bold">مصروفات اليوم</div>
-          <div className="text-2xl font-extrabold text-red-600 mt-1">{fmt(todayExpenses)} {currency}</div>
+          <div className="text-xl font-extrabold text-red-600 mt-1">{fmt(todayExpenses)} {currency}</div>
         </div>
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10">
-          <div className="text-xs text-[#123B36]/60 font-bold">صافي اليوم</div>
-          <div className="text-2xl font-extrabold text-emerald-700 mt-1">{fmt(todaySales - todayExpenses)} {currency}</div>
+          <div className="text-xs text-[#123B36]/60 font-bold">هالك وعجز اليوم</div>
+          <div className="text-xl font-extrabold text-orange-600 mt-1">{fmt(todayWaste)} {currency}</div>
+        </div>
+        <div className="bg-emerald-900 text-white p-4 rounded-2xl shadow-sm col-span-2 sm:col-span-1">
+          <div className="text-xs text-emerald-200 font-bold">صافي الربح الحقيقي</div>
+          <div className="text-xl font-extrabold mt-1">{fmt(netProfit)} {currency}</div>
         </div>
       </div>
 
@@ -394,12 +439,12 @@ const SEED_RECIPES = [
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl">
           <div className="flex items-center gap-2 font-extrabold text-amber-900 text-sm mb-2">
             <AlertTriangle size={18} />
-            <span>تنبيهات انخفاض المخزون ({lowStock.length})</span>
+            <span>تنبيه نواقص المخزون ({lowStock.length})</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {lowStock.map((i) => (
-              <span key={i.id} className="bg-white px-3 py-1 rounded-xl text-xs font-bold text-amber-800 border border-amber-200">
-                {i.name}: {i.stock} {i.unit}
+            {lowStock.map((ing) => (
+              <span key={ing.id} className="bg-white px-3 py-1 rounded-xl text-xs font-bold text-amber-900 border border-amber-200">
+                {ing.name}: {ing.stock} {ing.unit}
               </span>
             ))}
           </div>
@@ -407,33 +452,49 @@ const SEED_RECIPES = [
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10">
-          <h3 className="font-extrabold text-sm mb-3 flex items-center gap-2"><Receipt size={16} /> تسجيل مصروف جديد</h3>
+        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+          <h3 className="font-extrabold text-sm flex items-center gap-2"><Receipt size={16} /> تسجيل مصروف يومي</h3>
           <form onSubmit={addExpense} className="flex gap-2">
-            <input value={expTitle} onChange={(e) => setExpTitle(e.target.value)} placeholder="البيان (مثلاً: ثلج، صيانة...)" className="flex-1 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
+            <input value={expTitle} onChange={(e) => setExpTitle(e.target.value)} placeholder="بيان المصروف (ثلج، كهرباء...)" className="flex-1 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
             <input type="number" step="0.001" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} placeholder="المبلغ" className="w-28 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
-            <button className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">حفظ</button>
+            <button className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">إضافة</button>
           </form>
+          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            {expenses.filter((e) => e.date === today).map((e) => (
+              <div key={e.id} className="flex justify-between items-center bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs">
+                <span className="font-bold">{e.title}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-red-600">{fmt(e.amount)} {currency}</span>
+                  <button onClick={() => db.deleteShared('expenses', e.id)} className="text-red-500"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10 flex items-center justify-between">
-          <div>
-            <h3 className="font-extrabold text-sm">مشاركة ملخص اليوم</h3>
-            <p className="text-xs text-[#123B36]/60 mt-1">إرسال تقرير المبيعات والمصروفات عبر واتساب</p>
+        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+          <h3 className="font-extrabold text-sm flex items-center gap-2"><BookOpen size={16} /> تكلفة الأصناف وهامش الربح (حسب الرسبي)</h3>
+          <div className="max-h-56 overflow-y-auto space-y-1.5 text-xs">
+            {itemProfitList.map((it) => (
+              <div key={it.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2 rounded-xl">
+                <div>
+                  <div className="font-bold">{it.name}</div>
+                  <div className="text-[11px] text-[#123B36]/60">البيع: {fmt(it.price)} • التكلفة: {fmt(it.cost)}</div>
+                </div>
+                <div className="text-left">
+                  <div className="font-extrabold text-emerald-700">+{fmt(it.profit)} {currency}</div>
+                  <div className={`text-[10px] font-bold ${it.margin < 50 ? 'text-red-600' : 'text-emerald-700'}`}>ربح {it.margin}%</div>
+                </div>
+              </div>
+            ))}
           </div>
-          <button
-            onClick={() => share?.(`تقرير ${settings?.shopName || 'نيوم'} (${today})\nالمبيعات: ${fmt(todaySales)} ${currency}\nالمصروفات: ${fmt(todayExpenses)} ${currency}\nالصافي: ${fmt(todaySales - todayExpenses)} ${currency}`)}
-            className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5"
-          >
-            <Send size={15} /> إرسال التقرير
-          </button>
         </div>
       </div>
     </div>
   )
 }
-
 export function InventoryScreen({ items, ingredients, recipes = [], currency }) {
+  const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 100 })
   const [subTab, setSubTab] = useState('ingredients')
   const [search, setSearch] = useState('')
   const [name, setName] = useState('')
@@ -446,6 +507,55 @@ export function InventoryScreen({ items, ingredients, recipes = [], currency }) 
   const [editIng, setEditIng] = useState(null)
   const [editItem, setEditItem] = useState(null)
   const [editRec, setEditRec] = useState(null)
+
+  const [auditIngId, setAuditIngId] = useState('')
+  const [actualQty, setActualQty] = useState('')
+  const [wasteIngId, setWasteIngId] = useState('')
+  const [wasteQty, setWasteQty] = useState('')
+  const [wasteReason, setWasteReason] = useState('تالف / انتهاء صلاحية')
+
+  const selectedAuditIng = ingredients.find((i) => i.id === auditIngId)
+  const auditDiff = selectedAuditIng && actualQty !== '' ? Number(actualQty) - Number(selectedAuditIng.stock || 0) : null
+
+  async function handleStocktake(e) {
+    e.preventDefault()
+    if (!selectedAuditIng || actualQty === '') return
+    const newStock = Number(actualQty)
+    const diff = newStock - Number(selectedAuditIng.stock || 0)
+    await db.updateShared('ingredients', selectedAuditIng.id, { stock: newStock })
+    if (diff !== 0) {
+      const loss = diff < 0 ? Math.abs(diff) * Number(selectedAuditIng.cost || 0) : 0
+      await db.insertShared('waste_logs', {
+        ingredient_id: selectedAuditIng.id,
+        ingredient_name: selectedAuditIng.name,
+        qty: diff,
+        unit: selectedAuditIng.unit,
+        cost_loss: loss,
+        reason: diff < 0 ? 'عجز جرد فعلي' : 'فائض جرد فعلي',
+        date: todayStr(),
+      })
+    }
+    setAuditIngId(''); setActualQty('')
+  }
+
+  async function handleAddWaste(e) {
+    e.preventDefault()
+    const ing = ingredients.find((i) => i.id === wasteIngId)
+    if (!ing || !wasteQty) return
+    const q = Number(wasteQty)
+    const loss = q * Number(ing.cost || 0)
+    await db.incrementShared('ingredients', ing.id, 'stock', -q)
+    await db.insertShared('waste_logs', {
+      ingredient_id: ing.id,
+      ingredient_name: ing.name,
+      qty: -q,
+      unit: ing.unit,
+      cost_loss: loss,
+      reason: wasteReason,
+      date: todayStr(),
+    })
+    setWasteIngId(''); setWasteQty('')
+  }
 
   async function addIngredient(e) {
     e.preventDefault()
@@ -509,12 +619,13 @@ export function InventoryScreen({ items, ingredients, recipes = [], currency }) 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2 bg-white p-2 rounded-2xl shadow-sm w-fit">
+        <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl shadow-sm w-fit">
           <button onClick={() => { setSubTab('ingredients'); setSearch('') }} className={`px-4 py-2 rounded-xl text-xs font-bold ${subTab === 'ingredients' ? 'bg-[#123B36] text-white' : ''}`}>الجرد والخامات ({ingredients.length})</button>
           <button onClick={() => { setSubTab('items'); setSearch('') }} className={`px-4 py-2 rounded-xl text-xs font-bold ${subTab === 'items' ? 'bg-[#123B36] text-white' : ''}`}>أصناف المنيو ({items.length})</button>
           <button onClick={() => { setSubTab('recipes'); setSearch('') }} className={`px-4 py-2 rounded-xl text-xs font-bold ${subTab === 'recipes' ? 'bg-[#123B36] text-white' : ''}`}>الرسبي والوصفات ({recipes.length})</button>
+          <button onClick={() => { setSubTab('waste'); setSearch('') }} className={`px-4 py-2 rounded-xl text-xs font-bold ${subTab === 'waste' ? 'bg-amber-600 text-white' : 'text-amber-900 bg-amber-50'}`}>الجرد الفعلي والهالك</button>
         </div>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث سريع في القائمة..." className="bg-white px-4 py-2.5 rounded-2xl text-xs shadow-sm outline-none min-w-[220px]" />
+        {subTab !== 'waste' && <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث سريع في القائمة..." className="bg-white px-4 py-2.5 rounded-2xl text-xs shadow-sm outline-none min-w-[220px]" />}
       </div>
 
       {subTab === 'ingredients' && (
@@ -562,7 +673,6 @@ export function InventoryScreen({ items, ingredients, recipes = [], currency }) 
           </div>
         </div>
       )}
-
       {subTab === 'items' && (
         <div className="bg-white p-4 rounded-2xl shadow-sm space-y-4">
           <form onSubmit={addItem} className="flex flex-wrap gap-2">
@@ -622,24 +732,8 @@ export function InventoryScreen({ items, ingredients, recipes = [], currency }) 
                 {(editRec.lines || []).map((line, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <span className="flex-1 font-bold">{line.name}</span>
-                    <input
-                      type="number"
-                      step="any"
-                      value={line.qty}
-                      onChange={(e) => {
-                        const updated = [...editRec.lines]
-                        updated[idx] = { ...line, qty: e.target.value }
-                        setEditRec({ ...editRec, lines: updated })
-                      }}
-                      className="w-24 bg-white px-2.5 py-1 rounded-lg border font-bold"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setEditRec({ ...editRec, lines: editRec.lines.filter((_, i) => i !== idx) })}
-                      className="text-red-500 p-1"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <input type="number" step="any" value={line.qty} onChange={(e) => { const updated = [...editRec.lines]; updated[idx] = { ...line, qty: e.target.value }; setEditRec({ ...editRec, lines: updated }) }} className="w-24 bg-white px-2.5 py-1 rounded-lg border font-bold" />
+                    <button type="button" onClick={() => setEditRec({ ...editRec, lines: editRec.lines.filter((_, i) => i !== idx) })} className="text-red-500 p-1"><Trash2 size={14} /></button>
                   </div>
                 ))}
               </div>
@@ -660,17 +754,53 @@ export function InventoryScreen({ items, ingredients, recipes = [], currency }) 
                     <button onClick={() => db.deleteShared('recipes', rec.id)} className="text-red-500 p-1"><Trash2 size={15} /></button>
                   </div>
                 </div>
-                <div className="text-[#123B36]/70">
-                  {(rec.lines || []).map((l) => `${l.name} (${l.qty})`).join(' • ')}
-                </div>
+                <div className="text-[#123B36]/70">{(rec.lines || []).map((l) => `${l.name} (${l.qty})`).join(' • ')}</div>
               </div>
             ))}
           </div>
         </div>
       )}
-    </div>
-  )
-}
+
+      {subTab === 'waste' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <form onSubmit={handleStocktake} className="bg-white p-4 rounded-2xl shadow-sm space-y-3 text-xs">
+            <h3 className="font-extrabold text-sm text-[#123B36]">1. الجرد الفعلي وحساب العجز / الفائض</h3>
+            <div>
+              <label className="block font-bold mb-1">اختر الخامة لجردها:</label>
+              <select value={auditIngId} onChange={(e) => { setAuditIngId(e.target.value); setActualQty('') }} className="w-full bg-[#F4F1EA] px-3 py-2.5 rounded-xl outline-none font-bold">
+                <option value="">-- اختر الخامة --</option>
+                {ingredients.map((i) => <option key={i.id} value={i.id}>{i.name} (الدفتري: {i.stock} {i.unit})</option>)}
+              </select>
+            </div>
+            {selectedAuditIng && (
+              <div className="bg-[#F4F1EA] p-3 rounded-xl space-y-2">
+                <div className="flex justify-between"><span>الرصيد المسجل في النظام:</span><b>{selectedAuditIng.stock} {selectedAuditIng.unit}</b></div>
+                <div>
+                  <label className="block font-bold mb-1">الكمية الفعلية الموجودة على الرف ({selectedAuditIng.unit}):</label>
+                  <input type="number" step="any" value={actualQty} onChange={(e) => setActualQty(e.target.value)} required className="w-full bg-white px-3 py-2 rounded-lg border font-bold" />
+                </div>
+                {auditDiff !== null && (
+                  <div className={`p-2 rounded-lg font-extrabold text-center ${auditDiff < 0 ? 'bg-red-100 text-red-700' : auditDiff > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
+                    {auditDiff < 0 ? `يوجد عجز: ${auditDiff} ${selectedAuditIng.unit}` : auditDiff > 0 ? `يوجد فائض: +${auditDiff} ${selectedAuditIng.unit}` : 'الرصيد مطابق تماماً (0 فرق)'}
+                  </div>
+                )}
+              </div>
+            )}
+            <button type="submit" className="w-full bg-[#123B36] text-white py-2.5 rounded-xl font-extrabold">اعتماد الجرد وتسوية الرصيد</button>
+          </form>
+
+          <form onSubmit={handleAddWaste} className="bg-white p-4 rounded-2xl shadow-sm space-y-3 text-xs">
+            <h3 className="font-extrabold text-sm text-red-700">2. تسجيل تالف / هالك / ضيافة</h3>
+            <div>
+              <label className="block font-bold mb-1">الخامة التالفة:</label>
+              <select value={wasteIngId} onChange={(e) => setWasteIngId(e.target.value)} required className="w-full bg-[#F4F1EA] px-3 py-2.5 rounded-xl outline-none font-bold">
+                <option value="">-- اختر الخامة --</option>
+                {ingredients.map((i) => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block font-bold mb-1">الكمية التالفة:</label>
 export function SettingsScreen({ settings }) {
   const { data: items } = useLiveShared('items')
   const { data: ingredients } = useLiveShared('ingredients')
