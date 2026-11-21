@@ -771,7 +771,6 @@ export function DashboardScreen({ invoices, ingredients, recipes, settings, feat
     </div>
   )
 }
-}
 export function InventoryScreen({ items, ingredients, recipes = [], currency }) {
   const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 100 })
   const [subTab, setSubTab] = useState('ingredients')
