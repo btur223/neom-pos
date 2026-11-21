@@ -433,8 +433,7 @@ const SEED_RECIPES = [
   )
 }
 
-export function InventoryScreen({ items, ingredients, currency }) {
-  const { data: recipes } = useLiveShared('recipes')
+export function InventoryScreen({ items, ingredients, recipes = [], currency }) {
   const [subTab, setSubTab] = useState('ingredients')
   const [search, setSearch] = useState('')
   const [name, setName] = useState('')
@@ -591,8 +590,7 @@ export function InventoryScreen({ items, ingredients, currency }) {
                   <div className="font-bold">{it.name}</div>
                   <div className="text-[#123B36]/60">{it.category} • {fmt(it.price)} {currency}</div>
                 </div>
-}
-
+                <div className="flex items-center gap-1">
 export function SettingsScreen({ settings }) {
   const { data: items } = useLiveShared('items')
   const { data: ingredients } = useLiveShared('ingredients')
