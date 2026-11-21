@@ -30,7 +30,8 @@ export default function App() {
   const { data: customers } = useLiveShared('customers')
   const { data: shifts } = useLiveShared('shifts', { order: '-opened_at', limit: 30 })
   const { data: settingsList } = useLiveShared('settings')
-  const settings = (settingsList && settingsList.length > 0) ? settingsList[0] : { id: 'main', currency: 'ر.ع', ownerPhone: '', shopName: 'نيوم' }
+  const { data: tableOrders } = useLiveShared('table_orders', { order: '-createdAt', limit: 50 })
+  const settings = (settingsList && settingsList.length > 0) ? settingsList : { id: 'main', currency: 'ر.ع', ownerPhone: '', shopName: 'نيوم' }
 
   if (isQrMenu) return <PublicQrMenu items={items} shopName={settings.shopName || 'نيوم'} currency={settings.currency || 'ر.ع'} />
   if (!user) return <TeamLogin appName={settings.shopName || 'نيوم'} onSignedIn={() => setUser(auth.getCurrentUser())} />
@@ -79,7 +80,7 @@ export default function App() {
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4">
-        {tab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} customers={customers} user={user} currency={settings.currency} shopName={settings.shopName} />}
+        {tab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} customers={customers} tableOrders={tableOrders} user={user} currency={settings.currency} shopName={settings.shopName} />}
         {tab === 'materials' && <MaterialsScreen ingredients={ingredients} shipments={shipments} currency={settings.currency} />}
         {tab === 'dashboard' && isManager && <DashboardScreen invoices={invoices} ingredients={ingredients} recipes={recipes} settings={settings} />}
         {tab === 'inventory' && isManager && <InventoryScreen items={items} ingredients={ingredients} recipes={recipes} currency={settings.currency} />}
@@ -92,11 +93,13 @@ export default function App() {
   )
 }
 
-function SalesScreen({ items, recipes, ingredients, invoices, customers, user, currency, shopName }) {
+function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOrders = [], user, currency, shopName }) {
   const [cat, setCat] = useState('الكل'); const [q, setQ] = useState(''); const [cart, setCart] = useState([])
   const [payMethod, setPayMethod] = useState('نقدي'); const [lastReceipt, setLastReceipt] = useState(null); const [busy, setBusy] = useState(false)
   const [phone, setPhone] = useState(''); const [redeemDiscount, setRedeemDiscount] = useState(0)
+  const [activeTableOrder, setActiveTableOrder] = useState(null)
 
+  const pendingOrders = (tableOrders || []).filter((o) => o.status === 'pending')
   const cats = useMemo(() => ['الكل', ...new Set(items.map((i) => i.category).filter(Boolean))], [items])
   const filtered = useMemo(() => items.filter((i) => (cat === 'الكل' || i.category === cat) && (!q || i.name.includes(q))), [items, cat, q])
   const cleanPhone = phone.replace(/\D/g, '')
@@ -127,20 +130,42 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, user, c
           await db.insertShared('customers', { phone: cleanPhone, points: earnedPts, total_spent: total, visits: 1 })
         }
       }
+     if (activeTableOrder) {
+        await db.updateShared('table_orders', activeTableOrder.id, { status: 'completed' })
+        setActiveTableOrder(null)
+      }
       setLastReceipt({ ...inv, lines: cart, phone: cleanPhone, earnedPts }); setCart([]); setRedeemDiscount(0); setPhone('')
     } finally { setBusy(false) }
   }
 
- function sendWhatsApp(rec) {
+  function sendWhatsApp(rec) {
     const linesTxt = rec.lines.map((l) => `- ${l.name} × ${l.qty} = ${fmt(l.price * l.qty)} ${currency}`).join('\n')
     const msg = `مرحباً بك في مقهى *${shopName || 'نيوم'}* ☕\nرقم الطلب: *${rec.number}*\nالتاريخ: ${rec.date}\n\n${linesTxt}\n\n*الإجمالي: ${fmt(rec.total)} ${currency}*\n${rec.earnedPts ? `نقاط الولاء المكتسبة: +${rec.earnedPts} نقطة ⭐\n` : ''}شكراً لزيارتكم!`
     const target = rec.phone ? (rec.phone.startsWith('968') ? rec.phone : `968${rec.phone}`) : ''
-   window.open('https://wa.me' + '/' + target + '?text=' + encodeURIComponent(msg), '_blank')
+    window.open('https://wa.me' + '/' + target + '?text=' + encodeURIComponent(msg), '_blank')
   }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2 space-y-3">
+        {pendingOrders.length > 0 && (
+          <div className="bg-amber-50 border-2 border-amber-400 p-3 rounded-2xl space-y-2">
+            <div className="font-extrabold text-xs text-amber-900">🔔 طلبات جديدة من الطاولات ({pendingOrders.length})</div>
+            <div className="flex flex-wrap gap-2">
+              {pendingOrders.map((ord) => (
+                <div key={ord.id} className="bg-white border border-amber-300 p-2.5 rounded-xl text-xs flex items-center gap-3 shadow-sm">
+                  <div>
+                    <div className="font-extrabold text-[#123B36]">طاولة {ord.table_num} • {fmt(ord.total)} {currency}</div>
+                    <div className="text-[11px] text-[#123B36]/70">{(ord.lines || []).map((l) => `${l.name}×${l.qty}`).join('، ')}</div>
+                    {ord.customer_note && <div className="text-[10px] text-amber-700 font-bold">ملاحظة: {ord.customer_note}</div>}
+                  </div>
+                  <button onClick={() => { setCart(ord.lines || []); setActiveTableOrder(ord) }} className="bg-[#123B36] text-white px-3 py-1.5 rounded-lg font-bold">اعتماد</button>
+                  <button onClick={() => db.updateShared('table_orders', ord.id, { status: 'cancelled' })} className="text-red-500 font-bold px-1">✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-2xl shadow-sm">
           <div className="relative flex-1 min-w-[180px]"><Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#123B36]/40" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث سريع..." className="w-full pr-9 pl-3 py-2 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
           <div className="flex gap-1.5 overflow-x-auto pb-1">{cats.map((c) => <button key={c} onClick={() => setCat(c)} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${cat === c ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA]'}`}>{c}</button>)}</div>
@@ -286,32 +311,120 @@ function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
 }
 
 function QrMenuModal({ shopName, onClose }) {
-  const menuUrl = `${window.location.origin}/?menu=1`
- const qrImg = 'https://quickchart.io' + '/qr?size=260&margin=2&text=' + encodeURIComponent(menuUrl)
+  const [tableNum, setTableNum] = useState('')
+  const base = `${window.location.origin}/?menu=1`
+  const menuUrl = tableNum ? `${base}&table=${encodeURIComponent(tableNum)}` : base
+  const qrImg = 'https://quickchart.io' + '/qr?size=260&margin=2&text=' + encodeURIComponent(menuUrl)
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-sm w-full p-5 text-center space-y-4">
-        <div className="flex justify-between items-center border-b pb-3"><h3 className="font-extrabold text-base">منيو الباركود للطاولات</h3><button onClick={onClose}><X size={18} /></button></div>
-        <img src={qrImg} alt="QR Menu" className="mx-auto rounded-xl border p-2" />
-        <p className="text-xs text-[#123B36]/70">اطبع هذا الرمز وضعه على طاولات مقهى <b>{shopName}</b> ليتصفح الزبائن المنيو والأسعار مباشرة من جوالاتهم.</p>
+        <div className="flex justify-between items-center border-b pb-3"><h3 className="font-extrabold text-base">منيو الباركود والطلب المباشر</h3><button onClick={onClose}><X size={18} /></button></div>
+        <div className="text-right">
+          <label className="block text-xs font-bold mb-1">رقم الطاولة (اختياري لتخصيص الباركود):</label>
+          <input value={tableNum} onChange={(e) => setTableNum(e.target.value)} placeholder="مثلاً: 1 أو 2 أو جلسة 3" className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold outline-none" />
+        </div>
+        <img src={qrImg} alt="QR Menu" className="mx-auto rounded-xl border p-2 w-52 h-52 object-contain" />
+        <p className="text-xs text-[#123B36]/70">يمسح الزبون الباركود في مقهى <b>{shopName}</b> ويطلب مباشرة فتصل الفاتورة للكاشير.</p>
         <div className="flex gap-2">
-          <button onClick={() => { navigator.clipboard.writeText(menuUrl); alert('تم نسخ رابط المنيو!') }} className="flex-1 py-2.5 rounded-xl bg-[#F4F1EA] font-bold text-xs">نسخ الرابط</button>
+          <button onClick={() => { navigator.clipboard.writeText(menuUrl); alert('تم نسخ الرابط!') }} className="flex-1 py-2.5 rounded-xl bg-[#F4F1EA] font-bold text-xs">نسخ الرابط</button>
           <a href={menuUrl} target="_blank" rel="noreferrer" className="flex-1 py-2.5 rounded-xl bg-[#123B36] text-white font-bold text-xs">معاينة المنيو</a>
         </div>
       </div>
     </div>
   )
 }
-
-function PublicQrMenu({ items, shopName, currency }) {
+        function PublicQrMenu({ items, shopName, currency }) {
+  const urlTable = typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('table') || '') : ''
   const [cat, setCat] = useState('الكل')
+  const [cart, setCart] = useState([])
+  const [table, setTable] = useState(urlTable)
+  const [note, setNote] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sentDone, setSentDone] = useState(false)
+
   const cats = ['الكل', ...new Set((items || []).map((i) => i.category).filter(Boolean))]
   const filtered = (items || []).filter((i) => cat === 'الكل' || i.category === cat)
+  const total = cart.reduce((s, l) => s + l.price * l.qty, 0)
+
+  function addToOrder(item) {
+    setCart((prev) => {
+      const idx = prev.findIndex((x) => x.id === item.id)
+      if (idx > -1) { const c = [...prev]; c[idx].qty += 1; return c }
+      return [...prev, { id: item.id, name: item.name, price: Number(item.price), qty: 1 }]
+    })
+  }
+
+  async function sendOrder(e) {
+    e.preventDefault()
+    if (!cart.length || !table.trim() || sending) return
+    setSending(true)
+    try {
+      await db.insertShared('table_orders', {
+        table_num: table.trim(),
+        customer_note: note.trim(),
+        lines: cart,
+        total,
+        status: 'pending',
+      })
+      setCart([])
+      setNote('')
+      setSentDone(true)
+    } finally {
+      setSending(false)
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-[#F4F1EA] text-[#123B36] p-4 max-w-2xl mx-auto" dir="rtl">
-      <div className="bg-[#123B36] text-white p-5 rounded-2xl text-center mb-4 shadow"><h1 className="text-2xl font-extrabold">{shopName}</h1><p className="text-xs text-white/75 mt-1">قائمة المشروبات والمأكولات</p></div>
+    <div className="min-h-screen bg-[#F4F1EA] text-[#123B36] p-4 pb-32 max-w-2xl mx-auto" dir="rtl">
+      <div className="bg-[#123B36] text-white p-5 rounded-2xl text-center mb-4 shadow">
+        <h1 className="text-2xl font-extrabold">{shopName}</h1>
+        <p className="text-xs text-white/75 mt-1">{table ? `أهلاً بك في طاولة ${table} • اطلب مباشرة` : 'قائمة المشروبات والمأكولات'}</p>
+      </div>
+
+      {sentDone && (
+        <div className="bg-emerald-100 border border-emerald-300 text-emerald-900 p-4 rounded-2xl mb-4 text-center space-y-2">
+          <div className="font-extrabold text-sm">✅ تم إرسال طلبك للكاشير بنجاح!</div>
+          <div className="text-xs">جاري تحضير طلبك لطاولة <b>{table}</b>.</div>
+          <button onClick={() => setSentDone(false)} className="bg-[#123B36] text-white px-4 py-1.5 rounded-xl text-xs font-bold">طلب أصناف إضافية</button>
+        </div>
+      )}
+
       <div className="flex gap-1.5 overflow-x-auto pb-3 mb-2">{cats.map((c) => <button key={c} onClick={() => setCat(c)} className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${cat === c ? 'bg-[#123B36] text-white' : 'bg-white'}`}>{c}</button>)}</div>
-      <div className="space-y-2">{filtered.map((item) => <div key={item.id} className="bg-white p-3.5 rounded-xl flex justify-between items-center shadow-sm"><div><div className="font-bold text-sm">{item.name}</div><div className="text-[11px] text-[#123B36]/50">{item.category}</div></div><span className="font-extrabold text-sm">{fmt(item.price)} {currency}</span></div>)}</div>
+
+      <div className="space-y-2">
+        {filtered.map((item) => {
+          const inCart = cart.find((x) => x.id === item.id)
+          return (
+            <div key={item.id} className="bg-white p-3.5 rounded-xl flex justify-between items-center shadow-sm">
+              <div>
+                <div className="font-bold text-sm">{item.name}</div>
+                <div className="text-xs font-extrabold text-[#123B36]/70 mt-0.5">{fmt(item.price)} {currency}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                {inCart && (
+                  <>
+                    <button onClick={() => setCart((p) => p.map((x) => x.id === item.id ? { ...x, qty: x.qty - 1 } : x).filter((x) => x.qty > 0))} className="w-8 h-8 rounded-lg bg-[#F4F1EA] font-extrabold">-</button>
+                    <span className="font-extrabold text-sm w-5 text-center">{inCart.qty}</span>
+                  </>
+                )}
+                <button onClick={() => addToOrder(item)} className="px-3 py-1.5 rounded-xl bg-[#123B36] text-white text-xs font-bold">+ أضف</button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {cart.length > 0 && (
+        <form onSubmit={sendOrder} className="fixed bottom-0 inset-x-0 bg-white border-t shadow-lg p-3 max-w-2xl mx-auto space-y-2">
+          <div className="flex gap-2">
+            <input value={table} onChange={(e) => setTable(e.target.value)} required placeholder="رقم الطاولة *" className="w-28 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-extrabold outline-none" />
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظات (مثلاً: بدون سكر)" className="flex-1 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
+          </div>
+          <button type="submit" disabled={sending} className="w-full py-3 rounded-xl bg-[#123B36] text-white font-extrabold text-sm">
+            {sending ? 'جاري إرسال الطلب...' : `إرسال الطلب للكاشير (${cart.reduce((s, l) => s + l.qty, 0)} أصناف • ${fmt(total)} ${currency})`}
+          </button>
+        </form>
+      )}
     </div>
   )
 }
