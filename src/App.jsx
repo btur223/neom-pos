@@ -229,7 +229,118 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOr
             </div>
           </div>
 
-          <div className="mb-3 bg-[#F4F1EA] p-2.5 rounded-xl space-y-1.5">
+         <div className="mb-3 bg-[#F4F1EA] p-2.5 rounded-xl space-y-1.5">
+            <div className="flex items-center gap-2"><Award size={15} className="text-amber-600" /><input value={phone} onChange={(e) => { setPhone(e.target.value); setRedeemDiscount(0) }} placeholder="جوال العميل لنقاط الولاء (اختياري)" className="bg-transparent text-xs w-full outline-none font-bold" /></div>
+            {customer && (
+              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#123B36]/10">
+                <span className="font-bold text-emerald-700">رصيد العميل: {customer.points} نقطة</span>
+                {Number(customer.points) >= 50 && (
+                  <button onClick={() => setRedeemDiscount(redeemDiscount > 0 ? 0 : 0.5)} className={`px-2 py-0.5 rounded font-bold ${redeemDiscount > 0 ? 'bg-amber-600 text-white' : 'bg-white text-amber-700'}`}>
+                    {redeemDiscount > 0 ? 'إلغاء الخصم' : 'استبدال 50 نقطة (-0.500)'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {cart.length === 0 ? <p className="text-center text-xs text-[#123B36]/45 py-8">اضغط على الأصناف لإضافتها</p> : (
+            <div className="space-y-2 max-h-56 overflow-y-auto">{cart.map((l, idx) => (
+              <div key={l.id} className="flex items-center justify-between bg-[#F4F1EA] p-2.5 rounded-xl text-xs">
+                <div className="flex-1"><div className="font-bold">{l.name}</div><div className="text-[#123B36]/60">{fmt(l.price)} × {l.qty}</div></div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: Math.max(1, x.qty - 1) } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">-</button>
+                  <span className="w-5 text-center font-bold">{l.qty}</span>
+                  <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: x.qty + 1 } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">+</button>
+                  <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="text-red-600 p-1"><Trash2 size={15} /></button>
+                </div>
+              </div>
+            ))}</div>
+          )}
+
+          {cart.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <div className="relative">
+                <StickyNote size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
+                <input value={orderNote} onChange={(e) => setOrderNote(e.target.value)} placeholder="ملاحظة (بدون سكر...)" className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none" />
+              </div>
+              <div className="relative">
+                <Percent size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
+                <input type="number" step="0.050" min="0" value={manualDiscount} onChange={(e) => setManualDiscount(e.target.value)} placeholder={`خصم (${currency})`} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none font-bold" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t pt-3 mt-4 space-y-3">
+          <div className="flex gap-2">{['نقدي', 'بطاقة', 'تحويل'].map((m) => <button key={m} onClick={() => setPayMethod(m)} className={`flex-1 py-2 rounded-xl text-xs font-bold ${payMethod === m ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA]'}`}>{m}</button>)}</div>
+          {totalDiscount > 0 && <div className="flex justify-between text-xs font-bold text-amber-700"><span>إجمالي الخصم:</span><span>-{fmt(totalDiscount)} {currency}</span></div>}
+          <div className="flex justify-between items-center text-lg font-extrabold"><span>الإجمالي:</span><span>{fmt(total)} {currency}</span></div>
+          <button onClick={checkout} disabled={!cart.length || busy} className="w-full py-3.5 rounded-xl bg-[#123B36] text-white font-extrabold text-base disabled:opacity-40">{busy ? 'جاري الحفظ...' : 'إتمام البيع'}</button>
+
+          {lastReceipt && (
+            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl space-y-2 text-xs">
+              <div className="flex items-center justify-between"><span className="font-bold text-emerald-800">تم حفظ {lastReceipt.number}</span><span className="text-emerald-700 font-bold">{fmt(lastReceipt.total)} {currency}</span></div>
+              <div className="flex gap-2">
+                <button onClick={() => window.print()} className="flex-1 flex items-center justify-center gap-1 bg-[#123B36] text-white py-2 rounded-lg font-bold"><Printer size={14} /> طباعة</button>
+                <button onClick={() => sendWhatsApp(lastReceipt)} className="flex-1 flex items-center justify-center gap-1 bg-emerald-600 text-white py-2 rounded-lg font-bold"><MessageCircle size={14} /> واتساب</button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {lastReceipt && (
+          <div id="receipt-print" className="hidden print:block p-4 text-center text-xs" dir="rtl">
+            <h3 className="font-bold text-base">{shopName || 'نيوم'}</h3>
+            <p>طلب: {lastReceipt.number} | {lastReceipt.date}</p>
+            {lastReceipt.note && <p className="font-bold mt-1">ملاحظة: {lastReceipt.note}</p>}
+            <hr className="my-2" />
+            {lastReceipt.lines.map((l) => <div key={l.id} className="flex justify-between my-1"><span>{l.name} × {l.qty}</span><span>{fmt(l.price * l.qty)}</span></div>)}
+            <hr className="my-2" />
+            {lastReceipt.discount > 0 && <div className="flex justify-between my-1"><span>الخصم:</span><span>-{fmt(lastReceipt.discount)}</span></div>}
+            <p className="font-bold">الإجمالي: {fmt(lastReceipt.total)} {currency}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function MaterialsScreen({ ingredients, shipments = [], currency, isManager }) {
+  const [material, setMaterial] = useState(''); const [qty, setQty] = useState(''); const [unit, setUnit] = useState('كيلو'); const [price, setPrice] = useState(''); const [supplier, setSupplier] = useState(''); const [done, setDone] = useState(false)
+  async function handleSave(e) {
+    e.preventDefault(); if (!material || !qty) return
+    const numQty = Number(qty); const baseQty = numQty * ((unit === 'كيلو' || unit === 'لتر') ? 1000 : 1)
+    const baseUnit = unit === 'كيلو' ? 'جم' : unit === 'لتر' ? 'مل' : unit; const totalCost = Number(price || 0); const unitCost = baseQty > 0 ? totalCost / baseQty : 0
+    await db.insertShared('shipments', { date: todayStr(), material: material.trim(), supplier: supplier.trim(), qty: numQty, unit, price: totalCost, total: totalCost })
+    const existing = ingredients.find((i) => i.name.trim() === material.trim())
+    if (existing) { await db.incrementShared('ingredients', existing.id, 'stock', baseQty); if (unitCost > 0) await db.updateShared('ingredients', existing.id, { cost: unitCost }) }
+    else { await db.insertShared('ingredients', { name: material.trim(), unit: baseUnit, stock: baseQty, cost: unitCost, minStock: 500 }) }
+    setMaterial(''); setQty(''); setPrice(''); setSupplier(''); setDone(true); setTimeout(() => setDone(false), 3000)
+  }
+
+  const totalPurchases = shipments.reduce((s, x) => s + Number(x.total || x.price || 0), 0)
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-4">
+      <form onSubmit={handleSave} className="bg-white p-5 rounded-2xl shadow-sm space-y-4 border border-[#123B36]/10">
+        <h2 className="font-extrabold text-lg">تسجيل استلام خامات جديدة</h2>
+        <div><label className="block text-xs font-bold mb-1">اسم المادة</label><input list="ing-list" value={material} onChange={(e) => setMaterial(e.target.value)} required className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /><datalist id="ing-list">{ingredients.map((i) => <option key={i.id} value={i.name} />)}</datalist></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="block text-xs font-bold mb-1">الكمية</label><input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} required className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
+          <div><label className="block text-xs font-bold mb-1">الوحدة</label><select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm font-bold"><option value="كيلو">كيلو (جرام)</option><option value="جرام">جرام</option><option value="لتر">لتر (مل)</option><option value="مل">مل</option><option value="حبة">حبة</option></select></div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="block text-xs font-bold mb-1">السعر الإجمالي ({currency})</label><input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
+          <div><label className="block text-xs font-bold mb-1">المورد</label><input value={supplier} onChange={(e) => setSupplier(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
+        </div>
+        {done && <div className="p-3 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-2"><CheckCircle2 size={16} /> تم الحفظ وتحديث المخزون!</div>}
+        <button type="submit" className="w-full py-3.5 rounded-xl bg-[#123B36] text-white font-extrabold text-sm">حفظ وتحديث المخزون</button>
+      </form>
+
+      {shipments.length > 0 && (
+        <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
+          <div className="flex justify-between items-center">
+            <h3 className="font-extrabold text-sm">سجل استلام الخامات والموردين ({shipments.length})</h3>
 
 function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
   const [cashInput, setCashInput] = useState('')
