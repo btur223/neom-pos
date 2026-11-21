@@ -591,6 +591,86 @@ export function InventoryScreen({ items, ingredients, recipes = [], currency }) 
                   <div className="text-[#123B36]/60">{it.category} • {fmt(it.price)} {currency}</div>
                 </div>
                 <div className="flex items-center gap-1">
+                  <button onClick={() => setEditItem({ ...it })} className="bg-white text-[#123B36] px-2.5 py-1 rounded-lg font-bold border border-[#123B36]/15">تعديل</button>
+                  <button onClick={() => db.deleteShared('items', it.id)} className="text-red-500 p-1"><Trash2 size={15} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {subTab === 'recipes' && (
+        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-4">
+          <form onSubmit={addRecipeLine} className="flex flex-wrap gap-2">
+            <select value={selectedItem} onChange={(e) => setSelectedItem(e.target.value)} className="flex-1 min-w-[160px] bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none">
+              <option value="">اختر الصنف من المنيو...</option>
+              {items.map((it) => <option key={it.id} value={it.name}>{it.name}</option>)}
+            </select>
+            <select value={recIng} onChange={(e) => setRecIng(e.target.value)} className="flex-1 min-w-[140px] bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none">
+              <option value="">اختر الخامة...</option>
+              {ingredients.map((ing) => <option key={ing.id} value={ing.name}>{ing.name} ({ing.unit})</option>)}
+            </select>
+            <input type="number" step="any" value={recQty} onChange={(e) => setRecQty(e.target.value)} placeholder="الكمية" className="w-24 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
+            <button className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1"><Plus size={15} /> إضافة للوصفة</button>
+          </form>
+
+          {editRec && (
+            <form onSubmit={saveEditRecipe} className="bg-amber-50 border border-amber-300 p-3 rounded-xl space-y-2 text-xs">
+              <div className="font-extrabold text-amber-900">تعديل مقادير: {editRec.itemName}</div>
+              <div className="space-y-1.5">
+                {(editRec.lines || []).map((line, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="flex-1 font-bold">{line.name}</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={line.qty}
+                      onChange={(e) => {
+                        const updated = [...editRec.lines]
+                        updated[idx] = { ...line, qty: e.target.value }
+                        setEditRec({ ...editRec, lines: updated })
+                      }}
+                      className="w-24 bg-white px-2.5 py-1 rounded-lg border font-bold"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditRec({ ...editRec, lines: editRec.lines.filter((_, i) => i !== idx) })}
+                      className="text-red-500 p-1"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" className="bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold">حفظ التعديل</button>
+                <button type="button" onClick={() => setEditRec(null)} className="bg-white px-3 py-1.5 rounded-lg border">إلغاء</button>
+              </div>
+            </form>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[500px] overflow-y-auto">
+            {recipes.filter((r) => !search || r.itemName.includes(search)).map((rec) => (
+              <div key={rec.id} className="bg-[#F4F1EA] p-3 rounded-xl text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-[#123B36]">{rec.itemName}</span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setEditRec(JSON.parse(JSON.stringify(rec)))} className="bg-white text-[#123B36] px-2.5 py-1 rounded-lg font-bold border border-[#123B36]/15">تعديل</button>
+                    <button onClick={() => db.deleteShared('recipes', rec.id)} className="text-red-500 p-1"><Trash2 size={15} /></button>
+                  </div>
+                </div>
+                <div className="text-[#123B36]/70">
+                  {(rec.lines || []).map((l) => `${l.name} (${l.qty})`).join(' • ')}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 export function SettingsScreen({ settings }) {
   const { data: items } = useLiveShared('items')
   const { data: ingredients } = useLiveShared('ingredients')
