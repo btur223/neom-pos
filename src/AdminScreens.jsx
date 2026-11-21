@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Trash2, Send, AlertTriangle, Edit3, Sparkles, CheckCircle2, Receipt, BookOpen, Database } from 'lucide-react'
+import { Plus, Trash2, Send, AlertTriangle, Edit3, Sparkles, CheckCircle2, Receipt, BookOpen, Database, Calendar, TrendingUp, Users, RotateCcw } from 'lucide-react'
 import { db } from './lib/db'
 import { useLiveShared } from './lib/useLive'
 import { share } from './lib/share'
@@ -354,18 +354,34 @@ const SEED_RECIPES = [
   { itemName: 'عصير فيمتو', lines: [{ name: 'فيمتو', qty: 500 }, { name: 'سكر خشن', qty: 440 }] },
   ]
   export function DashboardScreen({ invoices, ingredients, recipes, settings }) {
-  const { data: expenses } = useLiveShared('expenses', { order: '-createdAt', limit: 100 })
+  const { data: expenses } = useLiveShared('expenses', { order: '-createdAt', limit: 200 })
   const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 200 })
   const { data: items } = useLiveShared('items')
   const [expTitle, setExpTitle] = useState('')
   const [expAmount, setExpAmount] = useState('')
+  const [period, setPeriod] = useState('today')
   const currency = settings?.currency || 'ر.ع'
 
   const today = todayStr()
-  const todayInvoices = invoices.filter((i) => i.date === today)
-  const todaySales = todayInvoices.reduce((s, i) => s + Number(i.total || 0), 0)
-  const todayExpenses = expenses.filter((e) => e.date === today).reduce((s, e) => s + Number(e.amount || 0), 0)
-  const todayWaste = (wasteLogs || []).filter((w) => w.date === today).reduce((s, w) => s + Number(w.cost_loss || 0), 0)
+
+  const isInPeriod = (dateStr) => {
+    if (!dateStr) return false
+    if (period === 'today') return dateStr === today
+    if (period === 'month') return dateStr.slice(0, 7) === today.slice(0, 7)
+    if (period === 'week') {
+      const diffDays = (new Date(today) - new Date(dateStr)) / (1000 * 60 * 60 * 24)
+      return diffDays >= 0 && diffDays <= 7
+    }
+    return true
+  }
+
+  const periodInvoices = useMemo(() => invoices.filter((i) => isInPeriod(i.date)), [invoices, period, today])
+  const periodExpenses = useMemo(() => expenses.filter((e) => isInPeriod(e.date)), [expenses, period, today])
+  const periodWasteLogs = useMemo(() => (wasteLogs || []).filter((w) => isInPeriod(w.date)), [wasteLogs, period, today])
+
+  const totalSales = periodInvoices.reduce((s, i) => s + Number(i.total || 0), 0)
+  const totalExpenses = periodExpenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+  const totalWaste = periodWasteLogs.reduce((s, w) => s + Number(w.cost_loss || 0), 0)
   const lowStock = ingredients.filter((ing) => Number(ing.stock || 0) <= Number(ing.minStock || 0))
 
   const ingCostMap = useMemo(() => {
@@ -383,14 +399,26 @@ const SEED_RECIPES = [
     return m
   }, [recipes, ingCostMap])
 
-  const todayCogs = useMemo(() => {
-    return todayInvoices.reduce((sum, inv) => {
+  const totalCogs = useMemo(() => {
+    return periodInvoices.reduce((sum, inv) => {
       const invCost = (inv.lines || []).reduce((s, l) => s + ((recipeCostMap[l.name] || 0) * Number(l.qty || 1)), 0)
       return sum + invCost
     }, 0)
-  }, [todayInvoices, recipeCostMap])
+  }, [periodInvoices, recipeCostMap])
 
-  const netProfit = todaySales - todayCogs - todayExpenses - todayWaste
+  const netProfit = totalSales - totalCogs - totalExpenses - totalWaste
+
+  const topSelling = useMemo(() => {
+    const counts = {}
+    periodInvoices.forEach((inv) => {
+      (inv.lines || []).forEach((l) => {
+        if (!counts[l.name]) counts[l.name] = { name: l.name, qty: 0, revenue: 0 }
+        counts[l.name].qty += Number(l.qty || 1)
+        counts[l.name].revenue += Number(l.price || 0) * Number(l.qty || 1)
+      })
+    })
+    return Object.values(counts).sort((a, b) => b.qty - a.qty).slice(0, 5)
+  }, [periodInvoices])
 
   const itemProfitList = useMemo(() => {
     return (items || []).map((it) => {
@@ -410,24 +438,56 @@ const SEED_RECIPES = [
     setExpAmount('')
   }
 
+  async function cancelAndRestockInvoice(inv) {
+    if (!confirm(`هل أنت متأكد من إلغاء الفاتورة ${inv.number} وإرجاع كميات الخامات للمخزون؟`)) return
+    if (inv.stockDeducted && inv.lines) {
+      for (const line of inv.lines) {
+        const rec = recipes.find((r) => r.itemId === line.id || r.itemName === line.name)
+        if (rec && rec.lines) {
+          for (const rl of rec.lines) {
+            const ing = ingredients.find((x) => x.id === rl.ingredientId || x.name === rl.name)
+            if (ing) await db.incrementShared('ingredients', ing.id, 'stock', Number(rl.qty) * Number(line.qty || 1))
+          }
+        }
+      }
+    }
+    await db.deleteShared('invoices', inv.id)
+  }
+
+  const periodLabels = { today: 'اليوم', week: 'آخر 7 أيام', month: 'هذا الشهر', all: 'الإجمالي الكلي' }
+
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-3 rounded-2xl shadow-sm border border-[#123B36]/10">
+        <div className="flex items-center gap-2 font-extrabold text-xs text-[#123B36]">
+          <Calendar size={16} />
+          <span>عرض التقارير والأرباح حسب الفترة:</span>
+        </div>
+        <div className="flex gap-1.5">
+          {Object.entries(periodLabels).map(([key, label]) => (
+            <button key={key} onClick={() => setPeriod(key)} className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition ${period === key ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA] text-[#123B36]/75'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10">
-          <div className="text-xs text-[#123B36]/60 font-bold">مبيعات اليوم ({todayInvoices.length})</div>
-          <div className="text-xl font-extrabold text-[#123B36] mt-1">{fmt(todaySales)} {currency}</div>
+          <div className="text-xs text-[#123B36]/60 font-bold">مبيعات {periodLabels[period]} ({periodInvoices.length})</div>
+          <div className="text-xl font-extrabold text-[#123B36] mt-1">{fmt(totalSales)} {currency}</div>
         </div>
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10">
           <div className="text-xs text-[#123B36]/60 font-bold">تكلفة الخامات (الرسبي)</div>
-          <div className="text-xl font-extrabold text-amber-700 mt-1">{fmt(todayCogs)} {currency}</div>
+          <div className="text-xl font-extrabold text-amber-700 mt-1">{fmt(totalCogs)} {currency}</div>
         </div>
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10">
-          <div className="text-xs text-[#123B36]/60 font-bold">مصروفات اليوم</div>
-          <div className="text-xl font-extrabold text-red-600 mt-1">{fmt(todayExpenses)} {currency}</div>
+          <div className="text-xs text-[#123B36]/60 font-bold">مصروفات {periodLabels[period]}</div>
+          <div className="text-xl font-extrabold text-red-600 mt-1">{fmt(totalExpenses)} {currency}</div>
         </div>
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10">
-          <div className="text-xs text-[#123B36]/60 font-bold">هالك وعجز اليوم</div>
-          <div className="text-xl font-extrabold text-orange-600 mt-1">{fmt(todayWaste)} {currency}</div>
+          <div className="text-xs text-[#123B36]/60 font-bold">هالك وعجز {periodLabels[period]}</div>
+          <div className="text-xl font-extrabold text-orange-600 mt-1">{fmt(totalWaste)} {currency}</div>
         </div>
         <div className="bg-emerald-900 text-white p-4 rounded-2xl shadow-sm col-span-2 sm:col-span-1">
           <div className="text-xs text-emerald-200 font-bold">صافي الربح الحقيقي</div>
@@ -460,9 +520,9 @@ const SEED_RECIPES = [
             <button className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">إضافة</button>
           </form>
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
-            {expenses.filter((e) => e.date === today).map((e) => (
+            {periodExpenses.map((e) => (
               <div key={e.id} className="flex justify-between items-center bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs">
-                <span className="font-bold">{e.title}</span>
+                <div><span className="font-bold">{e.title}</span> <span className="text-[10px] text-[#123B36]/50">({e.date})</span></div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-red-600">{fmt(e.amount)} {currency}</span>
                   <button onClick={() => db.deleteShared('expenses', e.id)} className="text-red-500"><Trash2 size={14} /></button>
@@ -473,26 +533,18 @@ const SEED_RECIPES = [
         </div>
 
         <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
-          <h3 className="font-extrabold text-sm flex items-center gap-2"><BookOpen size={16} /> تكلفة الأصناف وهامش الربح (حسب الرسبي)</h3>
-          <div className="max-h-56 overflow-y-auto space-y-1.5 text-xs">
-            {itemProfitList.map((it) => (
-              <div key={it.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2 rounded-xl">
-                <div>
-                  <div className="font-bold">{it.name}</div>
-                  <div className="text-[11px] text-[#123B36]/60">البيع: {fmt(it.price)} • التكلفة: {fmt(it.cost)}</div>
-                </div>
-                <div className="text-left">
-                  <div className="font-extrabold text-emerald-700">+{fmt(it.profit)} {currency}</div>
-                  <div className={`text-[10px] font-bold ${it.margin < 50 ? 'text-red-600' : 'text-emerald-700'}`}>ربح {it.margin}%</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+          <h3 className="font-extrabold text-sm flex items-center gap-2"><TrendingUp size={16} /> الأصناف الأكثر مبيعاً ({periodLabels[period]})</h3>
+          {topSelling.length === 0 ? (
+            <p className="text-xs text-[#123B36]/50 py-6 text-center">لا توجد مبيعات مسجلة في هذه الفترة.</p>
+          ) : (
+            <div className="space-y-2 text-xs">
+              {topSelling.map((item, idx) => (
+                <div key={item.name} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2.5 rounded-xl">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-6 h-6 rounded-lg bg-[#123B36] text-white font-extrabold flex items-center justify-center text-[11px]">{idx + 1}</span>
+                    <span className="font-extrabold">{item.name}</span>
+                  </div>
+                  <div className="text-left">
 export function InventoryScreen({ items, ingredients, recipes = [], currency }) {
   const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 100 })
   const [subTab, setSubTab] = useState('ingredients')
@@ -846,6 +898,27 @@ export function SettingsScreen({ settings }) {
   const [seeding, setSeeding] = useState(false)
   const [seedDone, setSeedDone] = useState(false)
 
+  const [staff, setStaff] = useState(() => getStaffList())
+  const [newStaffName, setNewStaffName] = useState('')
+  const [newStaffPin, setNewStaffPin] = useState('')
+  const [newStaffRole, setNewStaffRole] = useState('cashier')
+
+  function handleAddStaff(e) {
+    e.preventDefault()
+    if (!newStaffName.trim() || !newStaffPin.trim()) return
+    const updated = [...staff, { id: `staff-${Date.now()}`, displayName: newStaffName.trim(), pin: newStaffPin.trim(), role: newStaffRole }]
+    setStaff(updated)
+    saveStaffList(updated)
+    setNewStaffName(''); setNewStaffPin('')
+  }
+
+  function handleDeleteStaff(id) {
+    if (staff.length <= 1) return alert('يجب بقاء حساب واحد على الأقل في النظام!')
+    const updated = staff.filter((s) => s.id !== id)
+    setStaff(updated)
+    saveStaffList(updated)
+  }
+
   async function saveSettings(e) {
     e.preventDefault()
     if (settings?.id && settings.id !== 'main') {
@@ -908,6 +981,30 @@ export function SettingsScreen({ settings }) {
             <CheckCircle2 size={16} /> تم زرع جميع البيانات بنجاح! انتقل إلى "الكاشير" أو "المخزن والوصفات".
           </div>
         )}
+      </div>
+
+      <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
+        <h3 className="font-extrabold text-sm flex items-center gap-2"><Users size={16} /> إدارة حسابات الموظفين والكاشير</h3>
+        <form onSubmit={handleAddStaff} className="flex flex-wrap gap-2">
+          <input value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} placeholder="اسم الموظف..." required className="flex-1 min-w-[130px] bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none font-bold" />
+          <input value={newStaffPin} onChange={(e) => setNewStaffPin(e.target.value)} placeholder="الرمز السري (PIN)" required className="w-32 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none font-bold" />
+          <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold outline-none">
+            <option value="cashier">كاشير</option>
+            <option value="manager">مدير</option>
+          </select>
+          <button type="submit" className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">إضافة</button>
+        </form>
+        <div className="space-y-1.5 text-xs">
+          {staff.map((st) => (
+            <div key={st.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2 rounded-xl">
+              <div>
+                <span className="font-extrabold">{st.displayName}</span>
+                <span className="text-[11px] text-[#123B36]/60 mr-2">({st.role === 'manager' ? 'مدير' : 'كاشير'} • الرمز: {st.pin})</span>
+              </div>
+              <button onClick={() => handleDeleteStaff(st.id)} className="text-red-500 p-1"><Trash2 size={14} /></button>
+            </div>
+          ))}
+        </div>
       </div>
 
       <form onSubmit={saveSettings} className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
