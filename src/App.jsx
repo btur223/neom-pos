@@ -82,7 +82,7 @@ export default function App() {
         {tab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} customers={customers} user={user} currency={settings.currency} shopName={settings.shopName} />}
         {tab === 'materials' && <MaterialsScreen ingredients={ingredients} shipments={shipments} currency={settings.currency} />}
         {tab === 'dashboard' && isManager && <DashboardScreen invoices={invoices} ingredients={ingredients} recipes={recipes} settings={settings} />}
-        {tab === 'inventory' && isManager && <InventoryScreen items={items} ingredients={ingredients} currency={settings.currency} />}
+        {tab === 'inventory' && isManager && <InventoryScreen items={items} ingredients={ingredients} recipes={recipes} currency={settings.currency} />}
         {tab === 'settings' && isManager && <SettingsScreen settings={settings} />}
       </main>
 
@@ -135,7 +135,7 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, user, c
     const linesTxt = rec.lines.map((l) => `- ${l.name} × ${l.qty} = ${fmt(l.price * l.qty)} ${currency}`).join('\n')
     const msg = `مرحباً بك في مقهى *${shopName || 'نيوم'}* ☕\nرقم الطلب: *${rec.number}*\nالتاريخ: ${rec.date}\n\n${linesTxt}\n\n*الإجمالي: ${fmt(rec.total)} ${currency}*\n${rec.earnedPts ? `نقاط الولاء المكتسبة: +${rec.earnedPts} نقطة ⭐\n` : ''}شكراً لزيارتكم!`
     const target = rec.phone ? (rec.phone.startsWith('968') ? rec.phone : `968${rec.phone}`) : ''
-    window.open(`https://wa.me{target}?text=${encodeURIComponent(msg)}`, '_blank')
+   window.open('https://wa.me' + '/' + target + '?text=' + encodeURIComponent(msg), '_blank')
   }
 
   return (
@@ -287,7 +287,7 @@ function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
 
 function QrMenuModal({ shopName, onClose }) {
   const menuUrl = `${window.location.origin}/?menu=1`
-  const qrImg = `https://qrserver.com{encodeURIComponent(menuUrl)}`
+ const qrImg = 'https://quickchart.io' + '/qr?size=260&margin=2&text=' + encodeURIComponent(menuUrl)
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-sm w-full p-5 text-center space-y-4">
