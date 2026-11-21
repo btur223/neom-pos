@@ -801,6 +801,42 @@ export function InventoryScreen({ items, ingredients, recipes = [], currency }) 
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block font-bold mb-1">الكمية التالفة:</label>
+             <input type="number" step="any" value={wasteQty} onChange={(e) => setWasteQty(e.target.value)} required className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl outline-none font-bold" />
+              </div>
+              <div>
+                <label className="block font-bold mb-1">السبب:</label>
+                <select value={wasteReason} onChange={(e) => setWasteReason(e.target.value)} className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl outline-none font-bold">
+                  <option value="تالف / انتهاء صلاحية">تالف / انتهاء صلاحية</option>
+                  <option value="انسكاب / خطأ تحضير">انسكاب / خطأ تحضير</option>
+                  <option value="ضيافة مجانية">ضيافة مجانية</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" className="w-full bg-red-600 text-white py-2.5 rounded-xl font-extrabold">خصم التالف من المخزون</button>
+          </form>
+
+          <div className="lg:col-span-2 bg-white p-4 rounded-2xl shadow-sm space-y-2 text-xs">
+            <h3 className="font-extrabold text-sm">سجل تسويات الجرد والهالك</h3>
+            <div className="max-h-56 overflow-y-auto space-y-1.5">
+              {(wasteLogs || []).map((w) => (
+                <div key={w.id} className="flex justify-between items-center bg-[#F4F1EA] px-3 py-2 rounded-xl">
+                  <div>
+                    <span className="font-extrabold">{w.ingredient_name}</span> • <span className="text-[#123B36]/70">{w.reason} ({w.date})</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`font-extrabold ${Number(w.qty) < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{Number(w.qty) > 0 ? `+${w.qty}` : w.qty} {w.unit}</span>
+                    {Number(w.cost_loss) > 0 && <span className="text-red-700 font-bold">(-{fmt(w.cost_loss)} {currency})</span>}
+                    <button onClick={() => db.deleteShared('waste_logs', w.id)} className="text-red-500"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}   
 export function SettingsScreen({ settings }) {
   const { data: items } = useLiveShared('items')
   const { data: ingredients } = useLiveShared('ingredients')
