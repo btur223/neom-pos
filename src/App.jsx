@@ -337,11 +337,31 @@ function MaterialsScreen({ ingredients, shipments = [], currency, isManager }) {
         <button type="submit" className="w-full py-3.5 rounded-xl bg-[#123B36] text-white font-extrabold text-sm">حفظ وتحديث المخزون</button>
       </form>
 
-      {shipments.length > 0 && (
+     {shipments.length > 0 && (
         <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
           <div className="flex justify-between items-center">
             <h3 className="font-extrabold text-sm">سجل استلام الخامات والموردين ({shipments.length})</h3>
-
+            {isManager && <span className="text-xs font-extrabold text-amber-800 bg-amber-50 px-3 py-1 rounded-xl">إجمالي المشتريات: {fmt(totalPurchases)} {currency}</span>}
+          </div>
+          <div className="max-h-72 overflow-y-auto space-y-2 text-xs">
+            {shipments.map((s) => (
+              <div key={s.id} className="flex justify-between items-center bg-[#F4F1EA] p-3 rounded-xl">
+                <div>
+                  <div className="font-extrabold">{s.material} <span className="text-[#123B36]/70">({s.qty} {s.unit || ''})</span></div>
+                  <div className="text-[11px] text-[#123B36]/60">{s.date} {s.supplier ? `• المورد: ${s.supplier}` : ''}</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-extrabold text-[#123B36]">{fmt(s.total || s.price)} {currency}</span>
+                  {isManager && <button onClick={() => db.deleteShared('shipments', s.id)} className="text-red-500 p-1"><Trash2 size={15} /></button>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
   const [cashInput, setCashInput] = useState('')
   const todayInvoices = (invoices || []).filter((i) => i.date === todayStr())
