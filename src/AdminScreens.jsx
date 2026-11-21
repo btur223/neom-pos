@@ -545,6 +545,57 @@ const SEED_RECIPES = [
                     <span className="font-extrabold">{item.name}</span>
                   </div>
                   <div className="text-left">
+                    <span className="font-extrabold text-emerald-800">{item.qty} كوب/قطعة</span>
+                    <span className="text-[11px] text-[#123B36]/60 mr-2">({fmt(item.revenue)} {currency})</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+          <h3 className="font-extrabold text-sm flex items-center gap-2"><RotateCcw size={16} /> سجل فواتير {periodLabels[period]} ({periodInvoices.length})</h3>
+          <div className="max-h-60 overflow-y-auto space-y-1.5 text-xs">
+            {periodInvoices.map((inv) => (
+              <div key={inv.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2.5 rounded-xl">
+                <div>
+                  <div className="font-extrabold">{inv.number} • {inv.paymentMethod} <span className="text-[10px] text-[#123B36]/60">({inv.cashierName || ''})</span></div>
+                  <div className="text-[11px] text-[#123B36]/70">{(inv.lines || []).map((l) => `${l.name}×${l.qty}`).join('، ')}</div>
+                  {inv.note && <div className="text-[10px] text-amber-700 font-bold">ملاحظة: {inv.note}</div>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-[#123B36]">{fmt(inv.total)} {currency}</span>
+                  <button onClick={() => cancelAndRestockInvoice(inv)} title="إلغاء الفاتورة وإرجاع المخزون" className="bg-red-100 text-red-700 px-2 py-1 rounded-lg font-bold text-[10px] hover:bg-red-200">إلغاء</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+          <h3 className="font-extrabold text-sm flex items-center gap-2"><BookOpen size={16} /> تكلفة الأصناف وهامش الربح (حسب الرسبي)</h3>
+          <div className="max-h-60 overflow-y-auto space-y-1.5 text-xs">
+            {itemProfitList.map((it) => (
+              <div key={it.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2 rounded-xl">
+                <div>
+                  <div className="font-bold">{it.name}</div>
+                  <div className="text-[11px] text-[#123B36]/60">البيع: {fmt(it.price)} • التكلفة: {fmt(it.cost)}</div>
+                </div>
+                <div className="text-left">
+                  <div className="font-extrabold text-emerald-700">+{fmt(it.profit)} {currency}</div>
+                  <div className={`text-[10px] font-bold ${it.margin < 50 ? 'text-red-600' : 'text-emerald-700'}`}>ربح {it.margin}%</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 export function InventoryScreen({ items, ingredients, recipes = [], currency }) {
   const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 100 })
   const [subTab, setSubTab] = useState('ingredients')
