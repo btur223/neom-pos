@@ -333,18 +333,30 @@ function QrMenuModal({ shopName, onClose }) {
     </div>
   )
 }
-        function PublicQrMenu({ items, shopName, currency }) {
+       function PublicQrMenu({ items, shopName, currency }) {
   const urlTable = typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('table') || '') : ''
   const [cat, setCat] = useState('الكل')
+  const [search, setSearch] = useState('')
   const [cart, setCart] = useState([])
   const [table, setTable] = useState(urlTable)
   const [note, setNote] = useState('')
   const [sending, setSending] = useState(false)
   const [sentDone, setSentDone] = useState(false)
+  const [showCartDrawer, setShowCartDrawer] = useState(false)
 
   const cats = ['الكل', ...new Set((items || []).map((i) => i.category).filter(Boolean))]
-  const filtered = (items || []).filter((i) => cat === 'الكل' || i.category === cat)
+  const filtered = (items || []).filter((i) => (cat === 'الكل' || i.category === cat) && (!search || i.name.includes(search)))
+  const featured = (items || []).slice(0, 4)
   const total = cart.reduce((s, l) => s + l.price * l.qty, 0)
+  const totalQty = cart.reduce((s, l) => s + l.qty, 0)
+
+  const getItemIcon = (item) => {
+    const txt = `${item.name} ${item.category || ''}`
+    if (txt.includes('موهيتو') || txt.includes('بارد') || txt.includes('آيس') || txt.includes('عصير')) return '🍹'
+    if (txt.includes('شاي') || txt.includes('كرك')) return '🍵'
+    if (txt.includes('حلى') || txt.includes('كيك') || txt.includes('كوكيز') || txt.includes('وافل')) return '🍰'
+    return '☕'
+  }
 
   function addToOrder(item) {
     setCart((prev) => {
@@ -352,6 +364,10 @@ function QrMenuModal({ shopName, onClose }) {
       if (idx > -1) { const c = [...prev]; c[idx].qty += 1; return c }
       return [...prev, { id: item.id, name: item.name, price: Number(item.price), qty: 1 }]
     })
+  }
+
+  function updateQty(id, delta) {
+    setCart((prev) => prev.map((x) => x.id === id ? { ...x, qty: x.qty + delta } : x).filter((x) => x.qty > 0))
   }
 
   async function sendOrder(e) {
@@ -368,6 +384,7 @@ function QrMenuModal({ shopName, onClose }) {
       })
       setCart([])
       setNote('')
+      setShowCartDrawer(false)
       setSentDone(true)
     } finally {
       setSending(false)
@@ -375,55 +392,156 @@ function QrMenuModal({ shopName, onClose }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F1EA] text-[#123B36] p-4 pb-32 max-w-2xl mx-auto" dir="rtl">
-      <div className="bg-[#123B36] text-white p-5 rounded-2xl text-center mb-4 shadow">
-        <h1 className="text-2xl font-extrabold">{shopName}</h1>
-        <p className="text-xs text-white/75 mt-1">{table ? `أهلاً بك في طاولة ${table} • اطلب مباشرة` : 'قائمة المشروبات والمأكولات'}</p>
+    <div className="min-h-screen bg-[#F7F4EE] text-[#123B36] pb-36 max-w-xl mx-auto font-sans" dir="rtl">
+      <div className="bg-gradient-to-br from-[#123B36] via-[#184D47] to-[#0B2623] text-white pt-7 pb-12 px-5 rounded-b-[2.5rem] shadow-xl text-center relative">
+        <span className="inline-block bg-emerald-400/20 text-emerald-200 border border-emerald-300/30 text-[10px] font-extrabold px-3 py-1 rounded-full mb-3">
+          ● مفتوح الآن • تحضير طازج
+        </span>
+        <div className="w-20 h-20 mx-auto mb-3 rounded-3xl bg-white p-2 shadow-lg flex items-center justify-center">
+          <img src="/logo.png" alt="Neom Tea" onError={(e) => (e.currentTarget.style.display = 'none')} className="w-16 h-16 object-contain" />
+        </div>
+        <h1 className="text-2xl font-extrabold tracking-wide">{shopName || 'نيوم'} <span className="text-amber-300 text-sm font-bold">Neom Tea</span></h1>
+        <p className="text-xs text-white/80 mt-1">
+          {table ? `طاولة رقم (${table}) • اطلب مشروبك المفضل بلمسة واحدة` : 'تجربة القهوة والشاي المختص • صلالة'}
+        </p>
+      </div>
+      <div className="px-4 -mt-6 space-y-5">
+        <div className="bg-white rounded-2xl shadow-lg p-2.5 flex items-center gap-2 border border-[#123B36]/10">
+          <Search size={18} className="text-[#123B36]/40 mr-2" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث في المنيو (موهيتو، كرك، لاتيه...)" className="w-full py-1 text-xs font-bold outline-none bg-transparent" />
+          {search && <button onClick={() => setSearch('')} className="text-xs text-gray-400 px-2">✕</button>}
+        </div>
+
+        {sentDone && (
+          <div className="bg-emerald-50 border-2 border-emerald-400 text-emerald-950 p-4 rounded-3xl text-center space-y-2 shadow-sm">
+            <div className="text-2xl">✨☕</div>
+            <div className="font-extrabold text-sm">وصل طلبك للباريستا بنجاح!</div>
+            <p className="text-xs text-emerald-800">نحضّر طلبك بكل حب لطاولة <b>{table}</b>.</p>
+            <button onClick={() => setSentDone(false)} className="bg-[#123B36] text-white px-5 py-2 rounded-xl text-xs font-bold mt-1">طلب مشروب آخر</button>
+          </div>
+        )}
+
+        {!search && cat === 'الكل' && featured.length > 0 && (
+          <div className="space-y-2">
+            <h2 className="font-extrabold text-xs text-[#123B36]/80 px-1">🔥 مختارات نيوم الأكثر طلباً</h2>
+            <div className="grid grid-cols-2 gap-2.5">
+              {featured.map((item) => (
+                <div key={item.id} onClick={() => addToOrder(item)} className="bg-white p-3 rounded-2xl border border-amber-200/80 shadow-sm flex flex-col justify-between cursor-pointer active:scale-95 transition">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl">{getItemIcon(item)}</span>
+                    <span className="text-[10px] bg-amber-50 text-amber-800 font-extrabold px-2 py-0.5 rounded-lg border border-amber-200">مميز</span>
+                  </div>
+                  <div className="font-extrabold text-xs text-[#123B36] line-clamp-1">{item.name}</div>
+                  <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-[#123B36]/5">
+                    <span className="text-xs font-extrabold text-amber-700">{fmt(item.price)} {currency}</span>
+                    <span className="w-6 h-6 rounded-lg bg-[#123B36] text-white text-xs font-extrabold flex items-center justify-center">+</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {cats.map((c) => (
+            <button
+              key={c}
+              onClick={() => setCat(c)}
+              className={`px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all ${cat === c ? 'bg-[#123B36] text-white shadow-md' : 'bg-white text-[#123B36]/75 border border-[#123B36]/10'}`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-2.5">
+          {filtered.length === 0 ? (
+            <div className="bg-white p-8 rounded-3xl text-center text-xs text-[#123B36]/50 font-bold">لا توجد أصناف مطابقة لبحثك.</div>
+          ) : (
+            filtered.map((item) => {
+              const inCart = cart.find((x) => x.id === item.id)
+              return (
+                <div key={item.id} className={`bg-white p-3.5 rounded-2xl flex items-center justify-between shadow-sm border transition-all ${inCart ? 'border-[#123B36] ring-1 ring-[#123B36]/20' : 'border-[#123B36]/5'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-[#F7F4EE] flex items-center justify-center text-2xl shrink-0 border border-[#123B36]/10">
+                      {getItemIcon(item)}
+                    </div>
+                    <div>
+                      <div className="font-extrabold text-sm text-[#123B36]">{item.name}</div>
+                      {item.category && <div className="text-[10px] text-[#123B36]/50 font-bold mt-0.5">{item.category}</div>}
+                      <div className="text-xs font-extrabold text-amber-700 mt-1">{fmt(item.price)} <span className="text-[10px]">{currency}</span></div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {inCart ? (
+                      <div className="flex items-center gap-2 bg-[#F7F4EE] p-1 rounded-xl border border-[#123B36]/15">
+                        <button onClick={() => updateQty(item.id, -1)} className="w-7 h-7 rounded-lg bg-white text-[#123B36] font-extrabold shadow-xs">-</button>
+                        <span className="font-extrabold text-xs w-5 text-center">{inCart.qty}</span>
+                        <button onClick={() => updateQty(item.id, 1)} className="w-7 h-7 rounded-lg bg-[#123B36] text-white font-extrabold shadow-xs">+</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => addToOrder(item)} className="px-4 py-2 rounded-xl bg-[#123B36] text-white text-xs font-extrabold shadow-sm active:scale-95 transition">
+                        + أضف
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
       </div>
 
-      {sentDone && (
-        <div className="bg-emerald-100 border border-emerald-300 text-emerald-900 p-4 rounded-2xl mb-4 text-center space-y-2">
-          <div className="font-extrabold text-sm">✅ تم إرسال طلبك للكاشير بنجاح!</div>
-          <div className="text-xs">جاري تحضير طلبك لطاولة <b>{table}</b>.</div>
-          <button onClick={() => setSentDone(false)} className="bg-[#123B36] text-white px-4 py-1.5 rounded-xl text-xs font-bold">طلب أصناف إضافية</button>
+      {cart.length > 0 && !showCartDrawer && (
+        <div className="fixed bottom-4 inset-x-4 max-w-xl mx-auto z-40">
+          <button onClick={() => setShowCartDrawer(true)} className="w-full bg-[#123B36] text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-amber-300/40">
+            <div className="flex items-center gap-2.5">
+              <span className="bg-amber-400 text-[#123B36] w-7 h-7 rounded-xl font-extrabold text-xs flex items-center justify-center">{totalQty}</span>
+              <span className="font-extrabold text-sm">مراجعة وإرسال الطلب</span>
+            </div>
+            <span className="font-extrabold text-base text-amber-300">{fmt(total)} {currency}</span>
+          </button>
         </div>
       )}
 
-      <div className="flex gap-1.5 overflow-x-auto pb-3 mb-2">{cats.map((c) => <button key={c} onClick={() => setCat(c)} className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${cat === c ? 'bg-[#123B36] text-white' : 'bg-white'}`}>{c}</button>)}</div>
+      {showCartDrawer && cart.length > 0 && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center p-3">
+          <form onSubmit={sendOrder} className="bg-white w-full max-w-xl rounded-3xl p-5 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="font-extrabold text-base text-[#123B36]">سلة طلباتك ({totalQty})</h3>
+              <button type="button" onClick={() => setShowCartDrawer(false)} className="p-1.5 bg-[#F7F4EE] rounded-xl"><X size={18} /></button>
+            </div>
 
-      <div className="space-y-2">
-        {filtered.map((item) => {
-          const inCart = cart.find((x) => x.id === item.id)
-          return (
-            <div key={item.id} className="bg-white p-3.5 rounded-xl flex justify-between items-center shadow-sm">
+            <div className="max-h-48 overflow-y-auto space-y-2">
+              {cart.map((l) => (
+                <div key={l.id} className="flex justify-between items-center bg-[#F7F4EE] px-3 py-2 rounded-xl text-xs">
+                  <span className="font-extrabold">{l.name} <span className="text-[#123B36]/60">× {l.qty}</span></span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold">{fmt(l.price * l.qty)} {currency}</span>
+                    <button type="button" onClick={() => updateQty(l.id, -1)} className="w-6 h-6 rounded bg-white font-bold">-</button>
+                    <button type="button" onClick={() => updateQty(l.id, 1)} className="w-6 h-6 rounded bg-[#123B36] text-white font-bold">+</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
               <div>
-                <div className="font-bold text-sm">{item.name}</div>
-                <div className="text-xs font-extrabold text-[#123B36]/70 mt-0.5">{fmt(item.price)} {currency}</div>
+                <label className="block text-[11px] font-extrabold mb-1">رقم الطاولة *</label>
+                <input value={table} onChange={(e) => setTable(e.target.value)} required placeholder="مثلاً: 4" className="w-full bg-[#F7F4EE] px-3 py-2.5 rounded-xl text-xs font-extrabold outline-none border border-[#123B36]/20" />
               </div>
-              <div className="flex items-center gap-2">
-                {inCart && (
-                  <>
-                    <button onClick={() => setCart((p) => p.map((x) => x.id === item.id ? { ...x, qty: x.qty - 1 } : x).filter((x) => x.qty > 0))} className="w-8 h-8 rounded-lg bg-[#F4F1EA] font-extrabold">-</button>
-                    <span className="font-extrabold text-sm w-5 text-center">{inCart.qty}</span>
-                  </>
-                )}
-                <button onClick={() => addToOrder(item)} className="px-3 py-1.5 rounded-xl bg-[#123B36] text-white text-xs font-bold">+ أضف</button>
+              <div className="col-span-2">
+                <label className="block text-[11px] font-extrabold mb-1">ملاحظات للباريستا (اختياري)</label>
+                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="بدون سكر، ثلج زيادة..." className="w-full bg-[#F7F4EE] px-3 py-2.5 rounded-xl text-xs outline-none" />
               </div>
             </div>
-          )
-        })}
-      </div>
 
-      {cart.length > 0 && (
-        <form onSubmit={sendOrder} className="fixed bottom-0 inset-x-0 bg-white border-t shadow-lg p-3 max-w-2xl mx-auto space-y-2">
-          <div className="flex gap-2">
-            <input value={table} onChange={(e) => setTable(e.target.value)} required placeholder="رقم الطاولة *" className="w-28 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-extrabold outline-none" />
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظات (مثلاً: بدون سكر)" className="flex-1 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
-          </div>
-          <button type="submit" disabled={sending} className="w-full py-3 rounded-xl bg-[#123B36] text-white font-extrabold text-sm">
-            {sending ? 'جاري إرسال الطلب...' : `إرسال الطلب للكاشير (${cart.reduce((s, l) => s + l.qty, 0)} أصناف • ${fmt(total)} ${currency})`}
-          </button>
-        </form>
+            <button type="submit" disabled={sending} className="w-full py-3.5 rounded-2xl bg-[#123B36] text-white font-extrabold text-sm shadow-lg">
+              {sending ? 'جاري إرسال طلبك...' : `تأكيد وإرسال الطلب للكاشير • ${fmt(total)} ${currency}`}
+            </button>
+          </form>
+        </div>
       )}
     </div>
   )
