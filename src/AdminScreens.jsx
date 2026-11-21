@@ -353,7 +353,7 @@ const SEED_RECIPES = [
   { itemName: 'عصير تانك مانجو', lines: [{ name: 'عصير تانك مانجو', qty: 370 }, { name: 'سكر خشن', qty: 440 }] },
   { itemName: 'عصير فيمتو', lines: [{ name: 'فيمتو', qty: 500 }, { name: 'سكر خشن', qty: 440 }] },
   ]
-)
+}
 export function DashboardScreen({ invoices, ingredients, recipes, settings, features = {}, currentBranch = 'الفرع الرئيسي - صلالة' }) {
   const { data: expenses } = useLiveShared('expenses', { order: '-createdAt', limit: 200 })
   const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 200 })
