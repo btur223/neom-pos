@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { auth } from '../lib/auth'
 
 const DEFAULT_STAFF = [
-  { id: 'owner', displayName: 'المالك', role: 'manager', pin: '1234' },
+  { id: 'owner', displayName: 'edrees', role: 'manager', pin: '9900' },
   { id: 'cashier1', displayName: 'كاشير 1', role: 'cashier', pin: '1111' }
 ]
 
