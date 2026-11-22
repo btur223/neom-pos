@@ -11,13 +11,7 @@
   "theme_color": "#123B36",
   "icons": [
     {
-      "src": "https://jsdelivr.net",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "https://jsdelivr.net",
+      "src": "https://gstatic.com",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
