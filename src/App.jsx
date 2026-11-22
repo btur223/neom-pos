@@ -531,8 +531,7 @@ function QrMenuModal({ shopName, onClose }) {
   const [cart, setCart] = useState([]); const [note, setNote] = useState(''); const [sent, setSent] = useState(false); const [busy, setBusy] = useState(false)
   const [rating, setRating] = useState(5); const [fbComment, setFbComment] = useState(''); const [fbSent, setFbSent] = useState(false)
   const [activeCat, setActiveCat] = useState('الكل')
-  const params = new URLSearchParams(window.location.search)
-  const tableNum = params.get('table') || 'عام'
+ const [tableNum, setTableNum] = useState(() => new URLSearchParams(window.location.search).get('table') || '1')
   const cats = ['الكل', ...new Set(items.map((i) => i.category).filter(Boolean))]
   const total = cart.reduce((s, l) => s + l.price * l.qty, 0)
   const totalCount = cart.reduce((s, l) => s + l.qty, 0)
@@ -565,9 +564,19 @@ function QrMenuModal({ shopName, onClose }) {
     <div className="min-h-screen bg-[#F4F1EA] text-[#123B36] pb-32" dir="rtl">
       <header className="bg-gradient-to-l from-[#123B36] to-[#1a524b] text-white p-5 text-center sticky top-0 z-20 shadow-lg rounded-b-3xl">
         <h1 className="font-extrabold text-2xl tracking-wide">{shopName}</h1>
-        <span className="inline-block bg-amber-400/20 text-amber-200 border border-amber-300/30 px-3 py-0.5 rounded-full text-xs font-bold mt-1.5">
-          طاولة رقم ({tableNum})
-        </span>
+       <div className="mt-2 inline-flex items-center gap-2 bg-black/25 px-3 py-1.5 rounded-full border border-amber-400/40">
+          <span className="text-xs font-bold text-amber-200">اختر الطاولة:</span>
+          <select
+            value={tableNum}
+            onChange={(e) => setTableNum(e.target.value)}
+            className="bg-amber-400 text-slate-950 font-extrabold text-xs px-2.5 py-0.5 rounded-full outline-none"
+          >
+            {Array.from({ length: 15 }, (_, i) => String(i + 1)).map((n) => (
+              <option key={n} value={n}>طاولة {n}</option>
+            ))}
+            <option value="سفري">طلب سفري (Takeaway)</option>
+          </select>
+        </div>
       </header>
 
       {!sent && (
@@ -612,12 +621,12 @@ function QrMenuModal({ shopName, onClose }) {
                 <span className="w-1.5 h-5 bg-amber-500 rounded-full inline-block"></span>
                 <span>{c}</span>
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {items.filter((i) => i.category === c).map((it) => {
                   const inCart = cart.find((x) => x.id === it.id)
                   return (
-                    <div key={it.id} className={`bg-white p-4 rounded-2xl shadow-xs border transition flex items-center justify-between ${inCart ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-[#123B36]/10'}`}>
-                      <div>
+<div key={it.id} className={`bg-white p-3.5 rounded-2xl shadow-sm border transition flex flex-col justify-between items-center text-center gap-3 ${inCart ? 'border-amber-400/70' : 'border-white/10'}`}>
+                    <div>
                         <div className="font-extrabold text-sm text-[#123B36]">{it.name}</div>
                         <div className="text-xs font-extrabold text-amber-700 mt-1">{fmt(it.price)} {currency}</div>
                       </div>
