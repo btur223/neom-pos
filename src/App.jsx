@@ -32,7 +32,8 @@ export default function App() {
   const { data: settingsList } = useLiveShared('settings')
   const { data: tableOrders } = useLiveShared('table_orders', { order: '-createdAt', limit: 50 })
 const settings = (settingsList && settingsList.length > 0) ? settingsList : { id: 'main', currency: 'ر.ع', ownerPhone: '', shopName: 'نيوم' }
-  const f = { branches: true, barista: true, loyalty: true, qrMenu: true, holdDiscount: true, shifts: true, expiryCredit: true, analytics: true, quickCash: true, feedback: true, coupons: true, ...(settings.features || {}) }
+const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem('neom_features') || 'null') } catch { return null } })()
+  const f = { branches: true, barista: true, loyalty: true, qrMenu: true, holdDiscount: true, shifts: true, expiryCredit: true, analytics: true, quickCash: true, feedback: true, coupons: true, ...(settings.features || {}), ...(savedLocalFeatures || {}) }
   const branchesList = settings.branches || ['الفرع الرئيسي - صلالة']
   const [currentBranch, setCurrentBranch] = useState(() => localStorage.getItem('neom_branch') || branchesList)
 
