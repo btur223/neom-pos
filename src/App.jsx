@@ -490,15 +490,42 @@ function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
       <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4">
         <div className="flex justify-between items-center border-b pb-3"><h3 className="font-extrabold text-base">{openShift ? 'إغلاق الوردية ومطابقة الصندوق' : 'فتح وردية جديدة'}</h3><button onClick={onClose}><X size={18} /></button></div>
         {openShift ? (
-          <div className="space-y-3 text-xs">
+         <div className="space-y-3 text-xs">
             <div className="bg-[#F4F1EA] p-3 rounded-xl space-y-1.5">
               <div className="flex justify-between"><span>الرصيد الافتتاحي:</span><b>{fmt(openShift.opening_cash)} {currency}</b></div>
               <div className="flex justify-between"><span>مبيعات الكاش اليوم:</span><b>{fmt(cashSales)} {currency}</b></div>
               <div className="flex justify-between"><span>مبيعات البطاقة/التحويل:</span><b>{fmt(cardSales)} {currency}</b></div>
-              <div className="flex justify-between border-t pt-1.5 text-sm text-emerald-800"><span>الكاش المتوقع بالدرج:</span><b>{fmt(Number(openShift.opening_cash || 0) + cashSales)} {currency}</b></div>
+              <div className="flex justify-between border-t pt-1.5 font-extrabold"><span>إجمالي مبيعات اليوم ({todayInvoices.length} فاتورة):</span><b>{fmt(cashSales + cardSales)} {currency}</b></div>
+              <div className="flex justify-between text-sm text-emerald-500 pt-1"><span>الكاش المتوقع بالدرج:</span><b>{fmt(Number(openShift.opening_cash || 0) + cashSales)} {currency}</b></div>
             </div>
-            <div><label className="block font-bold mb-1">الكاش الفعلي المعدود في الدرج ({currency})</label><input type="number" step="any" value={cashInput} onChange={(e) => setCashInput(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] outline-none font-bold" /></div>
-            <button onClick={handleClose} className="w-full py-3 rounded-xl bg-red-600 text-white font-extrabold">إغلاق الوردية وحفظ التقرير</button>
+            <div>
+              <label className="block font-bold mb-1">الكاش الفعلي المعدود في الدرج ({currency})</label>
+              <input type="number" step="0.001" value={cashInput} onChange={(e) => setCashInput(e.target.value)} placeholder="0.000" className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl font-extrabold" />
+              {cashInput !== '' && (() => {
+                const diff = Number(cashInput) - (Number(openShift.opening_cash || 0) + cashSales)
+                return (
+                  <div className={`mt-1.5 text-[11px] font-extrabold px-2.5 py-1 rounded-lg ${diff === 0 ? 'bg-emerald-500/15 text-emerald-400' : diff > 0 ? 'bg-amber-500/15 text-amber-300' : 'bg-red-500/15 text-red-400'}`}>
+                    {diff === 0 ? '✓ الصندوق مطابق تماماً (0.000)' : diff > 0 ? `زيادة في الصندوق: +${fmt(diff)} ${currency}` : `عجز في الصندوق: ${fmt(diff)} ${currency}`}
+                  </div>
+                )
+              })()}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const exp = Number(openShift.opening_cash || 0) + cashSales
+                  const act = Number(cashInput || 0)
+                  const diff = act - exp
+                  const msg = `📊 *تقرير إغلاق الوردية (Z-Report)*\n• التاريخ: ${todayStr()}\n• الكاشير: ${openShift.cashier_name || user?.displayName || '-'}\n• عدد الفواتير: ${todayInvoices.length}\n• الرصيد الافتتاحي: ${fmt(openShift.opening_cash)} ${currency}\n• مبيعات الكاش: ${fmt(cashSales)} ${currency}\n• مبيعات الشبكة: ${fmt(cardSales)} ${currency}\n• الكاش المتوقع: ${fmt(exp)} ${currency}\n• الكاش الفعلي: ${fmt(act)} ${currency}\n• الفرق: ${diff >= 0 ? '+' : ''}${fmt(diff)} ${currency}`
+                  window.open(`https://wa.me{encodeURIComponent(msg)}`, '_blank')
+                }}
+                className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-extrabold"
+              >
+                إرسال التقرير واتساب 📲
+              </button>
+              <button onClick={handleClose} className="flex-1 py-3 rounded-xl bg-red-600 text-white font-extrabold">إغلاق الوردية وحفظ</button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3 text-xs">
