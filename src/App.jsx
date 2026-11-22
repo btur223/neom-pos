@@ -229,7 +229,27 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOr
     const target = rec.phone ? (rec.phone.startsWith('968') ? rec.phone : `968${rec.phone}`) : ''
     window.open('https://wa.me' + '/' + target + '?text=' + encodeURIComponent(msg), '_blank')
   }
-
+const [nowTick, setNowTick] = useState(Date.now())
+  const prevPendingRef = React.useRef(pendingOrders.length)
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 15000)
+    return () => clearInterval(t)
+  }, [])
+  useEffect(() => {
+    if (pendingOrders.length > prevPendingRef.current) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)()
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'sine'; osc.frequency.value = 880
+        gain.gain.setValueAtTime(0.15, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.start(); osc.stop(ctx.currentTime + 0.5)
+      } catch {}
+    }
+    prevPendingRef.current = pendingOrders.length
+  }, [pendingOrders.length])
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2 space-y-3">
@@ -240,7 +260,17 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOr
               {pendingOrders.map((ord) => (
                 <div key={ord.id} className="bg-white border border-amber-300 p-2.5 rounded-xl text-xs flex items-center gap-3 shadow-sm">
                   <div>
-                    <div className="font-extrabold text-[#123B36]">طاولة {ord.table_num} • {fmt(ord.total)} {currency}</div>
+                    <div className="font-extrabold text-[#123B36] flex items-center gap-2">
+                          <span>طاولة {ord.table_num} • {fmt(ord.total)} {currency}</span>
+                          {ord.created_at && (() => {
+                            const mins = Math.max(0, Math.floor((nowTick - new Date(ord.created_at).getTime()) / 60000))
+                            return (
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${mins >= 4 ? 'bg-red-600 text-white animate-pulse' : 'bg-emerald-600/20 text-emerald-700'}`}>
+                                ⏱ {mins} د
+                              </span>
+                            )
+                          })()}
+                        </div>
                     <div className="text-[11px] text-[#123B36]/70">{(ord.lines || []).map((l) => `${l.name}×${l.qty}`).join('، ')}</div>
                     {ord.customer_note && <div className="text-[10px] text-amber-700 font-bold">ملاحظة: {ord.customer_note}</div>}
                   </div>
