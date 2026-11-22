@@ -632,6 +632,76 @@ export function DashboardScreen({ invoices, ingredients, recipes, settings, feat
           </>
         )}
       </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-white/10 flex items-center justify-between">
+          <div className="space-y-2">
+            <h3 className="font-extrabold text-sm text-slate-300">المبيعات والتحصيل</h3>
+            <div className="text-xs flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-teal-400 inline-block"></span>
+              <span className="text-slate-400">نقدي:</span>
+              <span className="font-extrabold text-white">{fmt(cashSales)} {currency}</span>
+            </div>
+            <div className="text-xs flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>
+              <span className="text-slate-400">شبكة/تحويل:</span>
+              <span className="font-extrabold text-indigo-400">{fmt(cardSales)} {currency}</span>
+            </div>
+          </div>
+          <svg viewBox="0 0 120 120" className="w-28 h-28 -rotate-90">
+            <defs>
+              <linearGradient id="tealGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#2DD4BF" />
+                <stop offset="100%" stopColor="#6366F1" />
+              </linearGradient>
+            </defs>
+            <circle cx="60" cy="60" r="46" fill="none" stroke="#131824" strokeWidth="12" />
+            <circle cx="60" cy="60" r="46" fill="none" stroke="url(#tealGrad)" strokeWidth="12" strokeDasharray={`${totalSales > 0 ? Math.min(289, (cashSales / totalSales) * 289) : 210} 289`} strokeLinecap="round" />
+          </svg>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-white/10 flex items-center justify-between">
+          <div className="space-y-2">
+            <h3 className="font-extrabold text-sm text-slate-300">التكاليف والمصروفات</h3>
+            <div className="text-xs flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-teal-400 inline-block"></span>
+              <span className="text-slate-400">تكلفة الخامات:</span>
+              <span className="font-extrabold text-white">{fmt(cogs)} {currency}</span>
+            </div>
+            <div className="text-xs flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>
+              <span className="text-slate-400">المصروفات اليومية:</span>
+              <span className="font-extrabold text-indigo-400">{fmt(totalExpenses)} {currency}</span>
+            </div>
+          </div>
+          <svg viewBox="0 0 120 120" className="w-28 h-28 -rotate-90">
+            <circle cx="60" cy="60" r="46" fill="none" stroke="#131824" strokeWidth="12" />
+            <circle cx="60" cy="60" r="46" fill="none" stroke="url(#tealGrad)" strokeWidth="12" strokeDasharray={`${(cogs + totalExpenses) > 0 ? Math.min(289, (cogs / (cogs + totalExpenses)) * 289) : 180} 289`} strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
+
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-white/10 space-y-3">
+        <div className="flex justify-between items-center">
+          <h3 className="font-extrabold text-sm text-slate-300">التدفق النقدي والأرباح (Cash Flow)</h3>
+          <span className="text-xs font-extrabold text-teal-400">صافي الربح: {fmt(netProfit)} {currency}</span>
+        </div>
+        <svg viewBox="0 0 600 130" className="w-full h-32 overflow-visible">
+          <defs>
+            <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#3B82F6" />
+              <stop offset="50%" stopColor="#2DD4BF" />
+              <stop offset="100%" stopColor="#818CF8" />
+            </linearGradient>
+          </defs>
+          <line x1="0" y1="30" x2="600" y2="30" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+          <line x1="0" y1="70" x2="600" y2="70" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+          <line x1="0" y1="110" x2="600" y2="110" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+          <path d="M 10 95 Q 80 90, 130 65 T 250 55 T 370 45 T 490 30 T 590 25" fill="none" stroke="url(#lineGrad)" strokeWidth="3.5" strokeLinecap="round" />
+          {[[10, 95], [130, 65], [250, 55], [370, 45], [490, 30], [590, 25]].map(([cx, cy], idx) => (
+            <circle key={idx} cx={cx} cy={cy} r="4.5" fill="#1C2333" stroke="#2DD4BF" strokeWidth="2.5" />
+          ))}
+        </svg>
+      </div>
       <div className="bg-white p-5 rounded-2xl shadow-sm space-y-4 border border-[#123B36]/10">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
           <h3 className="font-extrabold text-base flex items-center gap-2 text-[#123B36]">
