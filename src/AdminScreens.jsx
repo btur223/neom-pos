@@ -1140,12 +1140,12 @@ export function SettingsScreen({ settings }) {
   const [newStaffPin, setNewStaffPin] = useState('')
   const [newStaffRole, setNewStaffRole] = useState('cashier')
 
-  async function syncSettingsPayload(nextFeatures, nextCoupons, nextBranches) {
-    const payload = { features: nextFeatures, coupons: nextCoupons, branches: nextBranches }
-    if (settings?.id && settings.id !== 'main') {
+async function syncSettingsPayload(nextFeatures, nextCoupons, nextBranches) {
+    const payload = { shopName, currency, features: nextFeatures, coupons: nextCoupons, branches: nextBranches }
+    if (settings?.id) {
       await db.updateShared('settings', settings.id, payload)
     } else {
-      await db.insertShared('settings', { shopName, currency, ...payload })
+      await db.insertShared('settings', { id: 'main', ...payload })
     }
   }
 
