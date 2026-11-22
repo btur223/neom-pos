@@ -1198,7 +1198,10 @@ export function SettingsScreen({ settings }) {
   const [seedDone, setSeedDone] = useState(false)
 
   const defaultFeatures = { branches: true, barista: true, loyalty: true, qrMenu: true, holdDiscount: true, shifts: true, expiryCredit: true, analytics: true, quickCash: true, feedback: true, coupons: true }
-  const [features, setFeatures] = useState(() => ({ ...defaultFeatures, ...(settings?.features || {}) }))
+  const [features, setFeatures] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem('neom_features') || 'null'); if (s) return s } catch {}
+    return { ...defaultFeatures, ...(settings?.features || {}) }
+  })
 
   const [branches, setBranches] = useState(() => settings?.branches || ['الفرع الرئيسي - صلالة'])
   const [newBranchName, setNewBranchName] = useState('')
@@ -1222,12 +1225,12 @@ async function syncSettingsPayload(nextFeatures, nextCoupons, nextBranches) {
     }
   }
 
-  async function toggleFeature(key) {
+ async function toggleFeature(key) {
     const next = { ...features, [key]: !features[key] }
     setFeatures(next)
+    localStorage.setItem('neom_features', JSON.stringify(next))
     await syncSettingsPayload(next, coupons, branches)
   }
-
   async function handleAddBranch(e) {
     e.preventDefault()
     if (!newBranchName.trim()) return
