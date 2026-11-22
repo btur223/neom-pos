@@ -14,3 +14,40 @@ body {
   #receipt-print, #receipt-print * { visibility: visible; }
   #receipt-print { position: fixed; left: 0; top: 0; width: 100%; }
 }
+/* الثيم الليلي الفاخر - مطابق لتصميم لوحة التحكم */
+body,
+.bg-\[\#F4F1EA\] {
+  background-color: #131824 !important;
+  color: #E2E8F0 !important;
+}
+
+.bg-white {
+  background-color: #1C2333 !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  color: #F8FAFC !important;
+}
+
+header.bg-\[\#123B36\] {
+  background-color: #0E121B !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+button.bg-\[\#123B36\],
+.bg-\[\#123B36\] {
+  background: linear-gradient(135deg, #2DD4BF, #3B82F6) !important;
+  color: #0F172A !important;
+  font-weight: 800 !important;
+}
+
+input, select {
+  background-color: #131824 !important;
+  color: #F8FAFC !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.text-\[\#123B36\],
+.text-\[\#123B36\]\/70,
+.text-\[\#123B36\]\/65,
+.text-\[\#123B36\]\/60 {
+  color: #CBD5E1 !important;
+}
