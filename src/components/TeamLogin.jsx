@@ -34,13 +34,7 @@ export default function TeamLogin({ appName, onSignedIn }) {
       setErr('اسم المستخدم أو الرمز السري غير صحيح')
       return
     }
-    if (auth.signInWithPin) {
-      auth.signInWithPin(found.id, cleanPin)
-    } else if (auth.login) {
-      auth.login(found.id, cleanPin)
-    } else {
-      localStorage.setItem('neom_user', JSON.stringify(found))
-    }
+    auth.signIn(found)
     if (onSignedIn) onSignedIn(found)
   }
 
