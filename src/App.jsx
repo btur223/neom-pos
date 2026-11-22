@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { ShoppingCart, Truck, LayoutDashboard, Boxes, SlidersHorizontal, LogOut, Trash2, Printer, CheckCircle2, Search, MessageCircle, Award, AlertTriangle, Clock, Download, QrCode, X, PauseCircle, PlayCircle, Percent, StickyNote, Coffee, CalendarClock, Store, Ticket, Star } from 'lucide-react'
 import { db } from './lib/db'
 import { auth } from './lib/auth'
@@ -230,7 +230,7 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOr
     window.open('https://wa.me' + '/' + target + '?text=' + encodeURIComponent(msg), '_blank')
   }
 const [nowTick, setNowTick] = useState(Date.now())
-  const prevPendingRef = React.useRef(pendingOrders.length)
+  const prevPendingRef = useRef(pendingOrders.length)
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 15000)
     return () => clearInterval(t)
