@@ -197,7 +197,7 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOr
         cashierName: user.displayName,
         customerPhone: cleanPhone || null,
         stockDeducted: true,
-        branch: currentBranch || 'الفرع الرئيسي',
+       branch: typeof branch !== 'undefined' ? branch : 'الفرع الرئيسي',
         channel,
         commission: commissionAmount,
       })
