@@ -148,6 +148,8 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOr
   const [manualDiscount, setManualDiscount] = useState(''); const [orderNote, setOrderNote] = useState('')
   const [heldOrders, setHeldOrders] = useState([])
   const [activeTableOrder, setActiveTableOrder] = useState(null)
+  const [channel, setChannel] = useState('محلي')
+  const [commRate, setCommRate] = useState(0)
 
   const pendingOrders = (tableOrders || []).filter((o) => o.status === 'pending')
   const cats = useMemo(() => ['الكل', ...new Set(items.map((i) => i.category).filter(Boolean))], [items])
@@ -159,6 +161,7 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOr
   const extraDiscount = Number(manualDiscount || 0)
   const totalDiscount = redeemDiscount + extraDiscount
   const total = Math.max(0, subTotal - totalDiscount)
+  const commissionAmount = Number(((total * commRate) / 100).toFixed(3))
   const nextOrderNum = `#${String(invoices.filter((inv) => inv.date === todayStr()).length + 1).padStart(2, '0')}`
 
   function addItem(item) {
@@ -193,7 +196,10 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOr
         cashierId: user.id,
         cashierName: user.displayName,
         customerPhone: cleanPhone || null,
-        stockDeducted: true
+        stockDeducted: true,
+        branch: currentBranch || 'الفرع الرئيسي',
+        channel,
+        commission: commissionAmount,
       })
       for (const line of cart) {
         const rec = recipes.find((r) => r.itemId === line.id || r.itemName === line.name)
@@ -321,6 +327,36 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOr
         </div>
 
         <div className="border-t pt-3 mt-4 space-y-3">
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-bold opacity-75">قناة الطلب / تطبيق التوصيل:</div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { name: 'محلي', rate: 0 },
+                { name: 'سفري', rate: 0 },
+                { name: 'طلبات', rate: 25 },
+                { name: 'تم', rate: 20 },
+                { name: 'توصيل خاص', rate: 0 },
+              ].map((ch) => (
+                <button
+                  key={ch.name}
+                  type="button"
+                  onClick={() => { setChannel(ch.name); setCommRate(ch.rate) }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition ${
+                    channel === ch.name
+                      ? 'bg-amber-400 text-slate-950 border-amber-400'
+                      : 'bg-black/20 border-white/10 opacity-75'
+                  }`}
+                >
+                  {ch.name}{ch.rate > 0 ? ` (${ch.rate}%)` : ''}
+                </button>
+              ))}
+            </div>
+            {commissionAmount > 0 && (
+              <div className="text-[11px] text-amber-300 font-bold">
+                عمولة التطبيق ({commRate}%): {fmt(commissionAmount)} {currency} • الصافي: {fmt(total - commissionAmount)} {currency}
+              </div>
+            )}
+          </div>
           <div className="flex gap-2">{['نقدي', 'بطاقة', 'تحويل'].map((m) => <button key={m} onClick={() => setPayMethod(m)} className={`flex-1 py-2 rounded-xl text-xs font-bold ${payMethod === m ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA]'}`}>{m}</button>)}</div>
           {totalDiscount > 0 && <div className="flex justify-between text-xs font-bold text-amber-700"><span>إجمالي الخصم:</span><span>-{fmt(totalDiscount)} {currency}</span></div>}
           <div className="flex justify-between items-center text-lg font-extrabold"><span>الإجمالي:</span><span>{fmt(total)} {currency}</span></div>
