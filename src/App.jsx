@@ -519,16 +519,22 @@ function QrMenuModal({ shopName, onClose }) {
     </div>
   )
 }
-     function PublicQrMenu({ items, shopName, currency, showFeedback = true }) {
+    function PublicQrMenu({ items, shopName, currency, showFeedback = true }) {
   const [cart, setCart] = useState([]); const [note, setNote] = useState(''); const [sent, setSent] = useState(false); const [busy, setBusy] = useState(false)
   const [rating, setRating] = useState(5); const [fbComment, setFbComment] = useState(''); const [fbSent, setFbSent] = useState(false)
+  const [activeCat, setActiveCat] = useState('الكل')
   const params = new URLSearchParams(window.location.search)
   const tableNum = params.get('table') || 'عام'
-  const cats = [...new Set(items.map((i) => i.category).filter(Boolean))]
+  const cats = ['الكل', ...new Set(items.map((i) => i.category).filter(Boolean))]
   const total = cart.reduce((s, l) => s + l.price * l.qty, 0)
+  const totalCount = cart.reduce((s, l) => s + l.qty, 0)
 
   function add(it) {
     setCart((p) => { const idx = p.findIndex((x) => x.id === it.id); if (idx > -1) { const c = [...p]; c[idx].qty += 1; return c } return [...p, { id: it.id, name: it.name, price: Number(it.price), qty: 1 }] })
+  }
+
+  function dec(id) {
+    setCart((p) => p.map((x) => x.id === id ? { ...x, qty: x.qty - 1 } : x).filter((x) => x.qty > 0))
   }
 
   async function sendOrder() {
@@ -544,45 +550,81 @@ function QrMenuModal({ shopName, onClose }) {
     await db.insertShared('feedbacks', { rating, comment: fbComment.trim(), table_num: tableNum })
     setFbSent(true)
   }
-       return (
-    <div className="min-h-screen bg-[#F4F1EA] text-[#123B36] pb-28" dir="rtl">
-      <header className="bg-[#123B36] text-white p-4 text-center sticky top-0 z-20 shadow-md">
-        <h1 className="font-extrabold text-xl">{shopName}</h1>
-        <p className="text-xs text-amber-200 mt-0.5">منيو الطاولة رقم ({tableNum})</p>
+
+  const shownCats = activeCat === 'الكل' ? cats.filter((c) => c !== 'الكل') : [activeCat]
+
+  return (
+    <div className="min-h-screen bg-[#F4F1EA] text-[#123B36] pb-32" dir="rtl">
+      <header className="bg-gradient-to-l from-[#123B36] to-[#1a524b] text-white p-5 text-center sticky top-0 z-20 shadow-lg rounded-b-3xl">
+        <h1 className="font-extrabold text-2xl tracking-wide">{shopName}</h1>
+        <span className="inline-block bg-amber-400/20 text-amber-200 border border-amber-300/30 px-3 py-0.5 rounded-full text-xs font-bold mt-1.5">
+          طاولة رقم ({tableNum})
+        </span>
       </header>
 
+      {!sent && (
+        <div className="sticky top-[88px] z-10 bg-[#F4F1EA]/95 backdrop-blur-xs py-2.5 px-4 border-b border-[#123B36]/10 overflow-x-auto flex gap-2">
+          {cats.map((c) => (
+            <button
+              key={c}
+              onClick={() => setActiveCat(c)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition ${activeCat === c ? 'bg-[#123B36] text-white shadow-xs' : 'bg-white text-[#123B36]/80 border border-[#123B36]/10'}`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
+
       {sent ? (
-        <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-3xl text-center space-y-4 shadow-md">
-          <CheckCircle2 size={44} className="mx-auto text-emerald-600" />
+        <div className="max-w-md mx-auto mt-8 mx-4 p-6 bg-white rounded-3xl text-center space-y-4 shadow-lg border border-[#123B36]/10">
+          <CheckCircle2 size={48} className="mx-auto text-emerald-600" />
           <h2 className="font-extrabold text-lg">تم إرسال طلبك للكاشير بنجاح!</h2>
-          <p className="text-xs text-[#123B36]/70">سيتم تحضير طلبك وتقديمه لطاولتك حالاً.</p>
+          <p className="text-xs text-[#123B36]/70">سيتم تحضير مشروباتك وتقديمها لطاولتك حالاً.</p>
           {showFeedback && !fbSent && (
-            <form onSubmit={sendFeedback} className="bg-[#F4F1EA] p-4 rounded-2xl space-y-2 text-right">
+            <form onSubmit={sendFeedback} className="bg-[#F4F1EA] p-4 rounded-2xl space-y-2.5 text-right">
               <div className="font-extrabold text-xs text-center">قيّم تجربتك معنا ☕</div>
-              <div className="flex justify-center gap-2 text-xl">
+              <div className="flex justify-center gap-2 text-2xl">
                 {[1, 2, 3, 4, 5].map((n) => (
-                  <button type="button" key={n} onClick={() => setRating(n)} className={n <= rating ? 'opacity-100 scale-110' : 'opacity-30'}>⭐</button>
+                  <button type="button" key={n} onClick={() => setRating(n)} className={`transition ${n <= rating ? 'opacity-100 scale-110' : 'opacity-30'}`}>⭐</button>
                 ))}
               </div>
-              <input value={fbComment} onChange={(e) => setFbComment(e.target.value)} placeholder="اكتب ملاحظتك أو اقتراحك (اختياري)..." className="w-full bg-white p-2 rounded-xl text-xs outline-none" />
-              <button type="submit" className="w-full py-2 rounded-xl bg-amber-500 text-[#123B36] font-extrabold text-xs">إرسال التقييم</button>
+              <input value={fbComment} onChange={(e) => setFbComment(e.target.value)} placeholder="اكتب ملاحظتك أو اقتراحك (اختياري)..." className="w-full bg-white p-2.5 rounded-xl text-xs outline-none" />
+              <button type="submit" className="w-full py-2.5 rounded-xl bg-amber-500 text-[#123B36] font-extrabold text-xs">إرسال التقييم</button>
             </form>
           )}
-          {fbSent && <div className="text-xs font-extrabold text-emerald-700">شكراً لتقييمك الجميل! ❤️</div>}
+          {fbSent && <div className="text-xs font-extrabold text-emerald-700 bg-emerald-50 py-2 rounded-xl">شكراً لتقييمك الجميل! ❤️</div>}
           <button onClick={() => { setSent(false); setFbSent(false) }} className="bg-[#123B36] text-white px-6 py-2.5 rounded-xl text-xs font-bold">طلب أصناف إضافية</button>
         </div>
       ) : (
-      <div className="max-w-2xl mx-auto p-4 space-y-5">
-          {cats.map((c) => (
-            <div key={c} className="space-y-2">
-              <h2 className="font-extrabold text-sm text-[#123B36] border-r-4 border-[#123B36] pr-2">{c}</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {items.filter((i) => i.category === c).map((it) => (
-                  <div key={it.id} className="bg-white p-3.5 rounded-2xl shadow-xs flex items-center justify-between">
-                    <div><div className="font-bold text-sm">{it.name}</div><div className="text-xs font-extrabold text-emerald-800 mt-0.5">{fmt(it.price)} {currency}</div></div>
-                    <button onClick={() => add(it)} className="bg-[#123B36] text-white px-3.5 py-1.5 rounded-xl text-xs font-bold">+ أضف</button>
-                  </div>
-                ))}
+        <div className="max-w-2xl mx-auto p-4 space-y-6">
+          {shownCats.map((c) => (
+            <div key={c} className="space-y-2.5">
+              <h2 className="font-extrabold text-base text-[#123B36] flex items-center gap-2">
+                <span className="w-1.5 h-5 bg-amber-500 rounded-full inline-block"></span>
+                <span>{c}</span>
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {items.filter((i) => i.category === c).map((it) => {
+                  const inCart = cart.find((x) => x.id === it.id)
+                  return (
+                    <div key={it.id} className={`bg-white p-4 rounded-2xl shadow-xs border transition flex items-center justify-between ${inCart ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-[#123B36]/10'}`}>
+                      <div>
+                        <div className="font-extrabold text-sm text-[#123B36]">{it.name}</div>
+                        <div className="text-xs font-extrabold text-amber-700 mt-1">{fmt(it.price)} {currency}</div>
+                      </div>
+                      {inCart ? (
+                        <div className="flex items-center gap-2 bg-[#F4F1EA] p-1 rounded-xl border border-[#123B36]/10">
+                          <button type="button" onClick={() => dec(it.id)} className="w-8 h-8 bg-white rounded-lg font-extrabold text-red-600 shadow-xs text-base">-</button>
+                          <span className="font-extrabold text-sm w-5 text-center">{inCart.qty}</span>
+                          <button type="button" onClick={() => add(it)} className="w-8 h-8 bg-[#123B36] text-white rounded-lg font-extrabold shadow-xs text-base">+</button>
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => add(it)} className="bg-[#123B36] hover:bg-[#1a524b] text-white px-4 py-2 rounded-xl text-xs font-extrabold shadow-xs">+ أضف</button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           ))}
@@ -590,12 +632,17 @@ function QrMenuModal({ shopName, onClose }) {
       )}
 
       {cart.length > 0 && !sent && (
-        <div className="fixed bottom-0 inset-x-0 bg-white border-t p-3 shadow-xl z-30">
-          <div className="max-w-2xl mx-auto space-y-2">
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظات للباريستا (بدون سكر، ثلج زيادة...)" className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-extrabold">{cart.reduce((s, l) => s + l.qty, 0)} أصناف • الإجمالي: {fmt(total)} {currency}</div>
-              <button onClick={sendOrder} disabled={busy} className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl text-xs font-extrabold">{busy ? 'جاري الإرسال...' : 'إرسال الطلب الآن'}</button>
+        <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-[#123B36]/15 p-3.5 shadow-2xl z-30 rounded-t-3xl">
+          <div className="max-w-2xl mx-auto space-y-2.5">
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظات للباريستا (بدون سكر، ثلج زيادة...)" className="w-full bg-[#F4F1EA] px-3.5 py-2.5 rounded-xl text-xs outline-none font-bold" />
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] text-[#123B36]/60 font-bold">{totalCount} أصناف مختارة</div>
+                <div className="text-base font-extrabold text-[#123B36]">{fmt(total)} {currency}</div>
+              </div>
+              <button onClick={sendOrder} disabled={busy} className="bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-3 rounded-2xl text-sm font-extrabold shadow-md">
+                {busy ? 'جاري الإرسال...' : 'إرسال الطلب الآن'}
+              </button>
             </div>
           </div>
         </div>
