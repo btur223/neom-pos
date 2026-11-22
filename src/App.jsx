@@ -109,7 +109,20 @@ const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem
               <span className="flex items-center gap-1.5 bg-black/20 px-2.5 py-0.5 rounded-lg"><CalendarClock size={15} /> قريب الانتهاء: {expiringItems.slice(0, 3).map((x) => `${x.material} (${x.expiry_date})`).join(' • ')}</span>
             )}
           </div>
-          {isManager && <button onClick={() => setTab('inventory')} className="underline shrink-0">عرض المخزن</button>}
+<div className="flex items-center gap-2 shrink-0">
+            {lowStockItems.length > 0 && (
+              <button
+                onClick={() => {
+                  const txt = `🚨 *نواقص المخزن (${shopName})*:\n` + lowStockItems.map((x) => `• ${x.name}: المتبقي ${x.stock} ${x.unit || ''}`).join('\n')
+                  window.open(`https://wa.me{encodeURIComponent(txt)}`, '_blank')
+                }}
+                className="bg-white text-red-700 px-2.5 py-1 rounded-full text-[11px] font-extrabold hover:bg-amber-100 transition"
+              >
+                واتساب النواقص 📲
+              </button>
+            )}
+            {isManager && <button onClick={() => setTab('inventory')} className="underline">عرض المخزن</button>}
+          </div>
         </div>
       )}
 
