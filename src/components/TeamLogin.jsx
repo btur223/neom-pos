@@ -1,6 +1,23 @@
 import { useState } from 'react'
 import { auth } from '../lib/auth'
 
+const DEFAULT_STAFF = [
+  { id: 'owner', displayName: 'المالك', role: 'manager', pin: '1234' },
+  { id: 'cashier1', displayName: 'كاشير 1', role: 'cashier', pin: '1111' }
+]
+
+export function getStaffList() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('neom_staff') || 'null')
+    if (Array.isArray(saved) && saved.length) return saved
+  } catch {}
+  return DEFAULT_STAFF
+}
+
+export function saveStaffList(list) {
+  localStorage.setItem('neom_staff', JSON.stringify(list))
+}
+
 export default function TeamLogin({ appName, onSignedIn }) {
   const [username, setUsername] = useState('')
   const [pin, setPin] = useState('')
@@ -10,8 +27,7 @@ export default function TeamLogin({ appName, onSignedIn }) {
     e.preventDefault()
     const clean = username.trim()
     const cleanPin = String(pin).trim()
-    const list = auth.getStaff ? auth.getStaff() : JSON.parse(localStorage.getItem('neom_staff') || '[{"id":"owner","displayName":"المالك","role":"manager","pin":"1234"},{"id":"cashier1","displayName":"كاشير 1","role":"cashier","pin":"1111"}]')
-    const found = list.find(
+    const found = getStaffList().find(
       (s) => (s.displayName === clean || s.name === clean || s.id === clean) && String(s.pin) === cleanPin
     )
     if (!found) {
