@@ -665,7 +665,7 @@ export function DashboardScreen({ invoices, ingredients, recipes, settings, feat
             <div className="text-xs flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-teal-400 inline-block"></span>
               <span className="text-slate-400">تكلفة الخامات:</span>
-              <span className="font-extrabold text-white">{fmt(cogs)} {currency}</span>
+             <span className="font-extrabold text-white">{fmt(Math.max(0, totalSales - netProfit - totalExpenses))} {currency}</span>
             </div>
             <div className="text-xs flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>
