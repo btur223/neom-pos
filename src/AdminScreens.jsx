@@ -1384,6 +1384,26 @@ async function syncSettingsPayload(nextFeatures, nextCoupons, nextBranches) {
         </div>
         <button className="bg-[#123B36] text-white px-5 py-2.5 rounded-xl text-xs font-bold">حفظ الإعدادات</button>
       </form>
+      <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
+        <h3 className="font-extrabold text-base text-[#123B36]">📲 تحميل وتثبيت تطبيق الجوال (أندرويد وآيفون)</h3>
+        <p className="text-xs text-[#123B36]/65">لتثبيت النظام كتطبيق مستقل على أي جهاز جديد للكاشير أو المالك:</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <a
+            href="/neom.apk"
+            download="Neom-POS.apk"
+            className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white py-3 px-4 rounded-xl text-xs font-extrabold shadow-xs transition"
+          >
+            <span>🤖 تحميل تطبيق الأندرويد (APK)</span>
+          </a>
+          <button
+            type="button"
+            onClick={() => alert('لتثبيت التطبيق على الآيفون (iOS):\n1. افتح رابط النظام في متصفح Safari\n2. اضغط على أيقونة المشاركة (⬆️) في الأسفل\n3. اختر "إضافة إلى الشاشة الرئيسية" (Add to Home Screen)')}
+            className="flex items-center justify-center gap-2 bg-[#123B36] hover:bg-[#1a524b] text-white py-3 px-4 rounded-xl text-xs font-extrabold shadow-xs transition"
+          >
+            <span>🍎 طريقة التثبيت على الآيفون (iOS)</span>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
