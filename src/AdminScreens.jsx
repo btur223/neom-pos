@@ -1277,10 +1277,23 @@ async function syncSettingsPayload(nextFeatures, nextCoupons, nextBranches) {
     { key: 'analytics', title: 'تحليلات المالك المتقدمة', desc: 'بطاقات الأصناف الأكثر مبيعاً وأداء الموظفين في الشاشة الرئيسية' },
   ]
 
+ const PERM_OPTIONS = [
+    { key: 'pos', label: 'الكاشير' },
+    { key: 'receiving', label: 'استلام الخامات' },
+    { key: 'inventory', label: 'المخزن' },
+    { key: 'dashboard', label: 'الأرباح والتقارير' },
+    { key: 'discount', label: 'منح خصم' },
+    { key: 'settings', label: 'الإعدادات' },
+  ]
+  const [newStaffPerms, setNewStaffPerms] = useState({ pos: true, receiving: false, inventory: false, dashboard: false, discount: false, settings: false })
+
   function handleAddStaff(e) {
     e.preventDefault()
     if (!newStaffName.trim() || !newStaffPin.trim()) return
-    const updated = [...staff, { id: `staff-${Date.now()}`, displayName: newStaffName.trim(), pin: newStaffPin.trim(), role: newStaffRole }]
+    const perms = newStaffRole === 'manager'
+      ? { pos: true, receiving: true, inventory: true, dashboard: true, discount: true, settings: true }
+      : newStaffPerms
+    const updated = [...staff, { id: `staff-${Date.now()}`, displayName: newStaffName.trim(), pin: newStaffPin.trim(), role: newStaffRole, perms }]
     setStaff(updated)
     saveStaffList(updated)
     setNewStaffName(''); setNewStaffPin('')
@@ -1401,30 +1414,47 @@ async function syncSettingsPayload(nextFeatures, nextCoupons, nextBranches) {
         </div>
       )}
 
-      <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
-        <h3 className="font-extrabold text-sm flex items-center gap-2"><Users size={16} /> إدارة حسابات الموظفين والكاشير</h3>
-        <form onSubmit={handleAddStaff} className="flex flex-wrap gap-2">
-          <input value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} placeholder="اسم الموظف..." required className="flex-1 min-w-[130px] bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none font-bold" />
-          <input value={newStaffPin} onChange={(e) => setNewStaffPin(e.target.value)} placeholder="الرمز السري (PIN)" required className="w-32 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none font-bold" />
-          <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold outline-none">
-            <option value="cashier">كاشير</option>
-            <option value="manager">مدير</option>
-          </select>
-          <button type="submit" className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">إضافة</button>
+     <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
+        <h3 className="font-extrabold text-sm flex items-center gap-2"><Users size={16} /> إدارة حسابات الموظفين والصلاحيات</h3>
+        <form onSubmit={handleAddStaff} className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <input value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} placeholder="اسم الموظف..." required className="bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold flex-1" />
+            <input value={newStaffPin} onChange={(e) => setNewStaffPin(e.target.value)} placeholder="الرمز السري (PIN)" required className="bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold w-32 text-center" />
+            <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold">
+              <option value="cashier">صلاحيات مخصصة</option>
+              <option value="manager">مدير (كامل الصلاحيات)</option>
+            </select>
+            <button type="submit" className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">إضافة</button>
+          </div>
+          {newStaffRole !== 'manager' && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {PERM_OPTIONS.map((p) => (
+                <label key={p.key} className="flex items-center gap-1.5 bg-[#F4F1EA] px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!newStaffPerms[p.key]}
+                    onChange={(e) => setNewStaffPerms({ ...newStaffPerms, [p.key]: e.target.checked })}
+                  />
+                  <span>{p.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
         </form>
         <div className="space-y-1.5 text-xs">
           {staff.map((st) => (
             <div key={st.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2 rounded-xl">
               <div>
                 <span className="font-extrabold">{st.displayName}</span>
-                <span className="text-[11px] text-[#123B36]/60 mr-2">({st.role === 'manager' ? 'مدير' : 'كاشير'} • الرمز: {st.pin})</span>
+                <span className="text-[11px] text-[#123B36]/60 mr-2">
+                  ({st.role === 'manager' ? 'مدير كامل' : PERM_OPTIONS.filter((p) => st.perms?.[p.key]).map((p) => p.label).join(' + ') || 'كاشير'} • الرمز: {st.pin})
+                </span>
               </div>
               <button onClick={() => handleDeleteStaff(st.id)} className="text-red-500 p-1"><Trash2 size={14} /></button>
             </div>
           ))}
         </div>
       </div>
-
       <div className="bg-gradient-to-l from-[#123B36] to-[#1e574f] text-white p-5 rounded-2xl shadow-md space-y-3">
         <div className="flex items-center gap-2 font-extrabold text-base">
           <Sparkles size={20} className="text-amber-300" />
