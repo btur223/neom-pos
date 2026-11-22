@@ -1298,6 +1298,17 @@ async function syncSettingsPayload(nextFeatures, nextCoupons, nextBranches) {
     saveStaffList(updated)
     setNewStaffName(''); setNewStaffPin('')
   }
+  function toggleStaffPerm(staffId, permKey) {
+    const updated = staff.map((st) => {
+      if (st.id !== staffId) return st
+      const basePerms = st.perms || (st.role === 'manager'
+        ? { pos: true, receiving: true, inventory: true, dashboard: true, discount: true, settings: true }
+        : { pos: true, receiving: true, inventory: false, dashboard: false, discount: false, settings: false })
+      return { ...st, role: 'cashier', perms: { ...basePerms, [permKey]: !basePerms[permKey] } }
+    })
+    setStaff(updated)
+    saveStaffList(updated)
+  }
 
   function handleDeleteStaff(id) {
     if (staff.length <= 1) return alert('يجب بقاء حساب واحد على الأقل في النظام!')
@@ -1441,18 +1452,39 @@ async function syncSettingsPayload(nextFeatures, nextCoupons, nextBranches) {
             </div>
           )}
         </form>
-        <div className="space-y-1.5 text-xs">
-          {staff.map((st) => (
-            <div key={st.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2 rounded-xl">
-              <div>
-                <span className="font-extrabold">{st.displayName}</span>
-                <span className="text-[11px] text-[#123B36]/60 mr-2">
-                  ({st.role === 'manager' ? 'مدير كامل' : PERM_OPTIONS.filter((p) => st.perms?.[p.key]).map((p) => p.label).join(' + ') || 'كاشير'} • الرمز: {st.pin})
-                </span>
+       <div className="space-y-2 text-xs">
+          {staff.map((st) => {
+            const stPerms = st.perms || (st.role === 'manager'
+              ? { pos: true, receiving: true, inventory: true, dashboard: true, discount: true, settings: true }
+              : { pos: true, receiving: true, inventory: false, dashboard: false, discount: false, settings: false })
+            return (
+              <div key={st.id} className="bg-[#F4F1EA] p-3 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-extrabold">{st.displayName}</span>
+                    <span className="text-[11px] opacity-70 mr-2">(الرمز: {st.pin})</span>
+                  </div>
+                  <button onClick={() => handleDeleteStaff(st.id)} className="text-red-500 p-1"><Trash2 size={14} /></button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {PERM_OPTIONS.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => toggleStaffPerm(st.id, p.key)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                        stPerms[p.key]
+                          ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40'
+                          : 'bg-black/20 opacity-50 border-white/10'
+                      }`}
+                    >
+                      {stPerms[p.key] ? '✓ ' : '+ '}{p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button onClick={() => handleDeleteStaff(st.id)} className="text-red-500 p-1"><Trash2 size={14} /></button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
       <div className="bg-gradient-to-l from-[#123B36] to-[#1e574f] text-white p-5 rounded-2xl shadow-md space-y-3">
