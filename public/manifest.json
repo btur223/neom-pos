@@ -11,7 +11,13 @@
   "theme_color": "#123B36",
   "icons": [
     {
-      "src": "https://flaticon.com",
+      "src": "https://jsdelivr.net",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://jsdelivr.net",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
