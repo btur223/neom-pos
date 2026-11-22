@@ -52,13 +52,20 @@ const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `neom-sales-${todayStr()}.csv`; a.click()
   }
 
+  const up = user?.perms || (isManager
+    ? { pos: true, receiving: true, inventory: true, dashboard: true, discount: true, settings: true }
+    : { pos: true, receiving: true, inventory: false, dashboard: false, discount: false, settings: false })
+
   const baseNav = [
-    ...(isManager ? [{ id: 'dashboard', label: 'الرئيسية والأرباح', icon: LayoutDashboard }] : []),
-    { id: 'sales', label: 'الكاشير', icon: ShoppingCart },
-    ...(f.barista ? [{ id: 'barista', label: 'الباريستا', icon: Coffee }] : []),
-    { id: 'materials', label: 'استلام الخامات', icon: Truck },
-    ...(isManager ? [{ id: 'inventory', label: 'المخزن والوصفات', icon: Boxes }, { id: 'settings', label: 'الإعدادات', icon: SlidersHorizontal }] : []),
+    ...((isManager || up.dashboard) ? [{ id: 'dashboard', label: 'الرئيسية والأرباح', icon: LayoutDashboard }] : []),
+    ...((isManager || up.pos) ? [{ id: 'sales', label: 'الكاشير', icon: ShoppingCart }] : []),
+    ...((f.barista && (isManager || up.pos)) ? [{ id: 'barista', label: 'الباريستا', icon: Coffee }] : []),
+    ...((isManager || up.receiving) ? [{ id: 'materials', label: 'استلام الخامات', icon: Truck }] : []),
+    ...((isManager || up.inventory) ? [{ id: 'inventory', label: 'المخزن والوصفات', icon: Boxes }] : []),
+    ...((isManager || up.settings) ? [{ id: 'settings', label: 'الإعدادات', icon: SlidersHorizontal }] : []),
   ]
+
+  const activeTab = baseNav.some((n) => n.id === tab) ? tab : (baseNav[0]?.id || 'sales')
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F1EA] text-[#123B36]" dir="rtl">
@@ -107,12 +114,12 @@ const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem
       )}
 
       <main className="flex-1 w-full px-3 sm:px-6 py-4">
-        {tab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} customers={customers} tableOrders={tableOrders} user={user} currency={settings.currency} shopName={settings.shopName} features={f} coupons={settings.coupons || []} currentBranch={currentBranch} />}
-        {tab === 'barista' && f.barista && <BaristaScreen invoices={invoices} currentBranch={currentBranch} showBranch={f.branches} />}
-        {tab === 'materials' && <MaterialsScreen ingredients={ingredients} shipments={shipments} currency={settings.currency} isManager={isManager} features={f} currentBranch={currentBranch} />}
-        {tab === 'dashboard' && isManager && <DashboardScreen invoices={invoices} ingredients={ingredients} recipes={recipes} settings={settings} features={f} currentBranch={currentBranch} />}
-        {tab === 'inventory' && isManager && <InventoryScreen items={items} ingredients={ingredients} recipes={recipes} currency={settings.currency} />}
-        {tab === 'settings' && isManager && <SettingsScreen settings={settings} />}
+        {activeTab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} customers={customers} tableOrders={tableOrders} user={user} currency={settings.currency} shopName={settings.shopName} features={f} coupons={settings.coupons || []} currentBranch={currentBranch} />}
+        {activeTab === 'barista' && f.barista && <BaristaScreen invoices={invoices} currentBranch={currentBranch} showBranch={f.branches} />}
+        {activeTab === 'materials' && <MaterialsScreen ingredients={ingredients} shipments={shipments} currency={settings.currency} isManager={isManager} features={f} currentBranch={currentBranch} />}
+        {activeTab === 'dashboard' && <DashboardScreen invoices={invoices} ingredients={ingredients} recipes={recipes} settings={settings} features={f} currentBranch={currentBranch} />}
+        {activeTab === 'inventory' && <InventoryScreen items={items} ingredients={ingredients} recipes={recipes} currency={settings.currency} />}
+        {activeTab === 'settings' &&  <SettingsScreen settings={settings} />}
       </main>
 
       {showShiftModal && <ShiftModal openShift={openShift} shifts={shifts} invoices={invoices} user={user} currency={settings.currency} onClose={() => setShowShiftModal(false)} />}
