@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { auth, getStaffList } from '../lib/auth'
+import { auth } from '../lib/auth'
 
 export default function TeamLogin({ appName, onSignedIn }) {
   const [username, setUsername] = useState('')
@@ -9,16 +9,19 @@ export default function TeamLogin({ appName, onSignedIn }) {
   function handleSubmit(e) {
     e.preventDefault()
     const clean = username.trim()
-    const staff = getStaffList()
-    const found = staff.find(
-      (s) => (s.displayName === clean || s.name === clean || s.id === clean) && String(s.pin) === String(pin).trim()
+    const cleanPin = String(pin).trim()
+    const list = auth.getStaff ? auth.getStaff() : JSON.parse(localStorage.getItem('neom_staff') || '[{"id":"owner","displayName":"المالك","role":"manager","pin":"1234"},{"id":"cashier1","displayName":"كاشير 1","role":"cashier","pin":"1111"}]')
+    const found = list.find(
+      (s) => (s.displayName === clean || s.name === clean || s.id === clean) && String(s.pin) === cleanPin
     )
     if (!found) {
       setErr('اسم المستخدم أو الرمز السري غير صحيح')
       return
     }
     if (auth.signInWithPin) {
-      auth.signInWithPin(found.id, pin.trim())
+      auth.signInWithPin(found.id, cleanPin)
+    } else if (auth.login) {
+      auth.login(found.id, cleanPin)
     } else {
       localStorage.setItem('neom_user', JSON.stringify(found))
     }
