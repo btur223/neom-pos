@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { ShoppingCart, Truck, LayoutDashboard, Boxes, SlidersHorizontal, LogOut, Trash2, Printer, CheckCircle2, Search, MessageCircle, Award, AlertTriangle, Clock, Download, QrCode, X, PauseCircle, PlayCircle, Percent, StickyNote, Coffee, CalendarClock, Store, Ticket, Star } from 'lucide-react'
+import { ShoppingCart, Truck, LayoutDashboard, Boxes, SlidersHorizontal, LogOut, Trash2, CheckCircle2, Search, Award, AlertTriangle, Clock, Download, QrCode, X, PauseCircle, PlayCircle, Percent, StickyNote, Coffee, CalendarClock, Store } from 'lucide-react'
 import { db } from './lib/db'
 import { auth } from './lib/auth'
 import { useLiveShared } from './lib/useLive'
@@ -18,7 +18,8 @@ export default function App() {
   const [showQrModal, setShowQrModal] = useState(false)
 
   useEffect(() => auth.onAuthChange(() => {
-    const u = auth.getCurrentUser(); setUser(u)
+    const u = auth.getCurrentUser()
+    setUser(u)
     if (u) setTab(u.role === 'manager' ? 'dashboard' : 'sales')
   }), [])
 
@@ -31,11 +32,19 @@ export default function App() {
   const { data: shifts } = useLiveShared('shifts', { order: '-opened_at', limit: 30 })
   const { data: settingsList } = useLiveShared('settings')
   const { data: tableOrders } = useLiveShared('table_orders', { order: '-createdAt', limit: 50 })
-const settings = (settingsList && settingsList.length > 0) ? settingsList : { id: 'main', currency: 'ر.ع', ownerPhone: '', shopName: 'نيوم' }
-const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem('neom_features') || 'null') } catch { return null } })()
+
+  const settings = (settingsList && settingsList.length > 0) ? settingsList : { id: 'main', currency: 'ر.ع', ownerPhone: '', shopName: 'نيوم' }
+  const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem('neom_features') || 'null') } catch { return null } })()
   const f = { branches: true, barista: true, loyalty: true, qrMenu: true, holdDiscount: true, shifts: true, expiryCredit: true, analytics: true, quickCash: true, feedback: true, coupons: true, ...(settings.features || {}), ...(savedLocalFeatures || {}) }
   const branchesList = settings.branches || ['الفرع الرئيسي - صلالة']
   const [currentBranch, setCurrentBranch] = useState(() => localStorage.getItem('neom_branch') || branchesList)
+
+  const [lang, setLang] = useState(() => localStorage.getItem('neom_lang') || 'ar')
+  const toggleLang = () => {
+    const next = lang === 'ar' ? 'en' : 'ar'
+    setLang(next)
+    localStorage.setItem('neom_lang', next)
+  }
 
   if (isQrMenu) return <PublicQrMenu items={items} shopName={settings.shopName || 'نيوم'} currency={settings.currency || 'ر.ع'} showFeedback={f.feedback} />
   if (!user) return <TeamLogin appName={settings.shopName || 'نيوم'} onSignedIn={() => setUser(auth.getCurrentUser())} />
@@ -49,19 +58,15 @@ const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem
     const rows = (invoices || []).map((inv) => [inv.number, inv.date, inv.branch || '', inv.cashierName || '', inv.paymentMethod || '', fmt(inv.discount || 0), fmt(inv.total)])
     const csv = '\uFEFF' + [headers, ...rows].map((r) => r.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `neom-sales-${todayStr()}.csv`; a.click()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `neom-sales-${todayStr()}.csv`
+    a.click()
   }
 
   const up = user?.perms || (isManager
     ? { pos: true, receiving: true, inventory: true, dashboard: true, discount: true, settings: true }
     : { pos: true, receiving: true, inventory: false, dashboard: false, discount: false, settings: false })
-
-  const [lang, setLang] = useState(() => localStorage.getItem('neom_lang') || 'ar');
-  const toggleLang = () => {
-    const next = lang === 'ar' ? 'en' : 'ar';
-    setLang(next);
-    localStorage.setItem('neom_lang', next);
-  };
 
   const baseNav = [
     ...((isManager || up.dashboard) ? [{ id: 'dashboard', label: lang === 'en' ? 'Dashboard' : 'الرئيسية والأرباح', icon: LayoutDashboard }] : []),
@@ -70,9 +75,9 @@ const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem
     ...((isManager || up.receiving) ? [{ id: 'materials', label: lang === 'en' ? 'Receiving' : 'استلام الخامات', icon: Truck }] : []),
     ...((isManager || up.inventory) ? [{ id: 'inventory', label: lang === 'en' ? 'Inventory' : 'المخزن والوصفات', icon: Boxes }] : []),
     ...((isManager || up.settings) ? [{ id: 'settings', label: lang === 'en' ? 'Settings' : 'الإعدادات', icon: SlidersHorizontal }] : []),
-  ];
+  ]
 
-  const activeTab = baseNav.some((n) => n.id === tab) ? tab : (baseNav[0]?.id || 'sales');
+  const activeTab = baseNav.some((n) => n.id === tab) ? tab : (baseNav?.id || 'sales')
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F1EA] text-[#123B36]" dir={lang === 'en' ? 'ltr' : 'rtl'}>
@@ -85,7 +90,7 @@ const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem
               <Store size={13} className="text-amber-300" />
               <select
                 value={currentBranch}
-                onChange={(e) => { setCurrentBranch(e.target.value); localStorage.setItem('neom_branch', e.target.value); }}
+                onChange={(e) => { setCurrentBranch(e.target.value); localStorage.setItem('neom_branch', e.target.value) }}
                 className="bg-transparent text-white font-bold outline-none cursor-pointer"
               >
                 {branchesList.map((b) => <option key={b} value={b} className="text-[#123B36]">{b}</option>)}
@@ -106,7 +111,14 @@ const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem
           </button>
         </div>
         <nav className="flex items-center gap-1.5 overflow-x-auto">
-          {baseNav.map((n) => { const Icon = n.icon; return <button key={n.id} onClick={() => setTab(n.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold transition ${activeTab === n.id ? 'bg-amber-400 text-slate-950' : 'bg-white/10 hover:bg-white/20'}`}><Icon size={15} /><span>{n.label}</span></button>; })}
+          {baseNav.map((n) => {
+            const Icon = n.icon
+            return (
+              <button key={n.id} onClick={() => setTab(n.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold transition ${activeTab === n.id ? 'bg-amber-400 text-slate-950' : 'bg-white/10 hover:bg-white/20'}`}>
+                <Icon size={15} /><span>{n.label}</span>
+              </button>
+            )
+          })}
           {f.qrMenu && <button onClick={() => setShowQrModal(true)} title="QR Menu" className="p-2 rounded-xl bg-white/10 hover:bg-white/20"><QrCode size={16} /></button>}
           {isManager && <button onClick={exportInvoicesCsv} title="Export Excel" className="p-2 rounded-xl bg-white/10 hover:bg-white/20"><Download size={16} /></button>}
           <button onClick={() => auth.signOut()} className="p-2 rounded-xl text-red-200 mr-1"><LogOut size={16} /></button>
@@ -123,11 +135,11 @@ const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem
               <span className="flex items-center gap-1.5 bg-black/20 px-2.5 py-0.5 rounded-lg"><CalendarClock size={15} /> قريب الانتهاء: {expiringItems.slice(0, 3).map((x) => `${x.material} (${x.expiry_date})`).join(' • ')}</span>
             )}
           </div>
-<div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {lowStockItems.length > 0 && (
               <button
                 onClick={() => {
-                  const txt = `🚨 *نواقص المخزن (${shopName})*:\n` + lowStockItems.map((x) => `• ${x.name}: المتبقي ${x.stock} ${x.unit || ''}`).join('\n')
+                  const txt = `🚨 *نواقص المخزن (${settings.shopName || 'نيوم'})*:\n` + lowStockItems.map((x) => `• ${x.name}: المتبقي ${x.stock} ${x.unit || ''}`).join('\n')
                   window.open(`https://wa.me{encodeURIComponent(txt)}`, '_blank')
                 }}
                 className="bg-white text-red-700 px-2.5 py-1 rounded-full text-[11px] font-extrabold hover:bg-amber-100 transition"
@@ -135,66 +147,52 @@ const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem
                 واتساب النواقص 📲
               </button>
             )}
-            {isManager && <button onClick={() => setTab('inventory')} className="underline">عرض المخزن</button>}
-          </div>
-        </div>
-      )}
-
-      <main className="flex-1 w-full px-3 sm:px-6 py-4">
-{activeTab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} customers={customers} tableOrders={tableOrders} user={user} currency={settings.currency} shopName={settings.shopName} cashierName={user.displayName} currentBranch={currentBranch} showBranch={f.branches} lang={lang} />}
-        {activeTab === 'barista' && f.barista && <BaristaScreen invoices={invoices} currentBranch={currentBranch} showBranch={f.branches} />}
-        {activeTab === 'materials' && <MaterialsScreen ingredients={ingredients} shipments={shipments} currency={settings.currency} isManager={isManager} features={f} currentBranch={currentBranch} />}
-        {activeTab === 'dashboard' && <DashboardScreen invoices={invoices} ingredients={ingredients} recipes={recipes} settings={settings} features={f} currentBranch={currentBranch} />}
-        {activeTab === 'inventory' && <InventoryScreen items={items} ingredients={ingredients} recipes={recipes} currency={settings.currency} />}
-        {activeTab === 'settings' &&  <SettingsScreen settings={settings} />}
-      </main>
-
-      {showShiftModal && <ShiftModal openShift={openShift} shifts={shifts} invoices={invoices} user={user} currency={settings.currency} onClose={() => setShowShiftModal(false)} />}
-      {showQrModal && <QrMenuModal shopName={settings.shopName || 'نيوم'} onClose={() => setShowQrModal(false)} />}
-    </div>
-  )
-}
-
-function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOrders = [], user, currency, shopName, cashierName, currentBranch, showBranch, lang = 'ar' }) {
-  const [cat, setCat] = useState('الكل'); const [q, setQ] = useState(''); const [cart, setCart] = useState([])
-  const [payMethod, setPayMethod] = useState('نقدي'); const [lastReceipt, setLastReceipt] = useState(null); const [busy, setBusy] = useState(false)
-  const [phone, setPhone] = useState(''); const [redeemDiscount, setRedeemDiscount] = useState(0)
-  const [manualDiscount, setManualDiscount] = useState(''); const [orderNote, setOrderNote] = useState('')
+            function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOrders = [], user, currency, shopName, cashierName, currentBranch, showBranch, lang = 'ar' }) {
+  const [cat, setCat] = useState('الكل')
+  const [q, setQ] = useState('')
+  const [cart, setCart] = useState([])
+  const [payMethod, setPayMethod] = useState('نقدي')
+  const [lastReceipt, setLastReceipt] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [phone, setPhone] = useState('')
+  const [redeemDiscount, setRedeemDiscount] = useState(0)
+  const [manualDiscount, setManualDiscount] = useState('')
+  const [orderNote, setOrderNote] = useState('')
   const [heldOrders, setHeldOrders] = useState([])
   const [activeTableOrder, setActiveTableOrder] = useState(null)
   const [channel, setChannel] = useState('محلي')
   const [commRate, setCommRate] = useState(0)
-const [lastSentCart, setLastSentCart] = useState([]);
-  const [kotTicket, setKotTicket] = useState(null);
+  const [lastSentCart, setLastSentCart] = useState([])
+  const [kotTicket, setKotTicket] = useState(null)
 
   function printBaristaTicket() {
-    const isFirst = lastSentCart.length === 0;
-    const added = [];
-    const cancelled = [];
+    const isFirst = lastSentCart.length === 0
+    const added = []
+    const cancelled = []
 
     cart.forEach((curr) => {
-      const prev = lastSentCart.find((p) => p.id === curr.id);
-      if (!prev) added.push({ ...curr });
-      else if (curr.qty > prev.qty) added.push({ ...curr, qty: curr.qty - prev.qty });
-      else if (curr.qty < prev.qty) cancelled.push({ ...curr, qty: prev.qty - curr.qty });
-    });
+      const prev = lastSentCart.find((p) => p.id === curr.id)
+      if (!prev) added.push({ ...curr })
+      else if (curr.qty > prev.qty) added.push({ ...curr, qty: curr.qty - prev.qty })
+      else if (curr.qty < prev.qty) cancelled.push({ ...curr, qty: prev.qty - curr.qty })
+    })
 
     lastSentCart.forEach((prev) => {
-      if (!cart.find((c) => c.id === prev.id)) cancelled.push({ ...prev });
-    });
+      if (!cart.find((c) => c.id === prev.id)) cancelled.push({ ...prev })
+    })
 
-    const sections = [];
+    const sections = []
     if (isFirst && added.length) {
-      sections.push({ labelAr: 'جديد', labelEn: 'New', lines: added });
+      sections.push({ labelAr: 'جديد', labelEn: 'New', lines: added })
     } else {
-      if (added.length) sections.push({ labelAr: 'إضافة', labelEn: 'Addition', lines: added });
-      if (cancelled.length) sections.push({ labelAr: 'ملغي', labelEn: 'Cancelled', lines: cancelled });
+      if (added.length) sections.push({ labelAr: 'إضافة', labelEn: 'Addition', lines: added })
+      if (cancelled.length) sections.push({ labelAr: 'ملغي', labelEn: 'Cancelled', lines: cancelled })
     }
     if (!sections.length && cart.length) {
-      sections.push({ labelAr: 'جديد', labelEn: 'New', lines: cart });
+      sections.push({ labelAr: 'جديد', labelEn: 'New', lines: cart })
     }
 
-    const now = new Date();
+    const now = new Date()
     setKotTicket({
       date: todayStr(),
       time: now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
@@ -202,16 +200,17 @@ const [lastSentCart, setLastSentCart] = useState([]);
       channel,
       note: orderNote,
       sections,
-    });
-    setLastSentCart(cart.map((c) => ({ ...c })));
+    })
+    setLastSentCart(cart.map((c) => ({ ...c })))
     setTimeout(() => {
-      window.print();
-      setTimeout(() => setKotTicket(null), 800);
-    }, 150);
+      window.print()
+      setTimeout(() => setKotTicket(null), 800)
+    }, 150)
   }
+
   const pendingOrders = (tableOrders || []).filter((o) => o.status === 'pending')
   const cats = useMemo(() => ['الكل', ...new Set(items.map((i) => i.category).filter(Boolean))], [items])
-  const filtered = useMemo(() => items.filter((i) => (cat === 'الكل' || i.category === cat) && (!q || i.name.includes(q))), [items, cat, q])
+  const filtered = useMemo(() => items.filter((i) => (cat === 'الكل' || i.category === cat) && (!q || i.name.includes(q) || (i.name_en && i.name_en.toLowerCase().includes(q.toLowerCase())))), [items, cat, q])
   const cleanPhone = phone.replace(/\D/g, '')
   const customer = useMemo(() => cleanPhone.length >= 8 ? (customers || []).find((c) => c.phone === cleanPhone) : null, [customers, cleanPhone])
 
@@ -223,24 +222,40 @@ const [lastSentCart, setLastSentCart] = useState([]);
   const nextOrderNum = `#${String(invoices.filter((inv) => inv.date === todayStr()).length + 1).padStart(2, '0')}`
 
   function addItem(item) {
-    setCart((prev) => { const idx = prev.findIndex((x) => x.id === item.id); if (idx > -1) { const c = [...prev]; c[idx].qty += 1; return c } return [...prev, { id: item.id, name: item.name, price: Number(item.price), qty: 1 }] })
+    setCart((prev) => {
+      const idx = prev.findIndex((x) => x.id === item.id)
+      if (idx > -1) {
+        const c = [...prev]
+        c[idx].qty += 1
+        return c
+      }
+      return [...prev, { id: item.id, name: item.name, name_en: item.name_en || '', price: Number(item.price), qty: 1 }]
+    })
   }
 
   function holdCurrentOrder() {
     if (!cart.length) return
     const label = activeTableOrder ? `طاولة ${activeTableOrder.table_num}` : (orderNote || `طلب معلق ${heldOrders.length + 1}`)
     setHeldOrders((prev) => [...prev, { id: Date.now(), label, cart, note: orderNote, discount: manualDiscount }])
-    setCart([]); setOrderNote(''); setManualDiscount(''); setActiveTableOrder(null)
+    setCart([])
+    setLastSentCart([])
+    setOrderNote('')
+    setManualDiscount('')
+    setActiveTableOrder(null)
   }
 
   function resumeHeldOrder(held) {
     if (cart.length > 0 && !confirm('السلة الحالية تحتوي على أصناف، هل تريد استبدالها بالطلب المعلق؟')) return
-    setCart(held.cart); setOrderNote(held.note || ''); setManualDiscount(held.discount || '')
+    setCart(held.cart)
+    setLastSentCart([])
+    setOrderNote(held.note || '')
+    setManualDiscount(held.discount || '')
     setHeldOrders((prev) => prev.filter((x) => x.id !== held.id))
   }
 
   async function checkout() {
-    if (!cart.length || busy) return; setBusy(true)
+    if (!cart.length || busy) return
+    setBusy(true)
     try {
       const inv = await db.insertShared('invoices', {
         date: todayStr(),
@@ -255,13 +270,18 @@ const [lastSentCart, setLastSentCart] = useState([]);
         cashierName: user.displayName,
         customerPhone: cleanPhone || null,
         stockDeducted: true,
-       branch: typeof branch !== 'undefined' ? branch : 'الفرع الرئيسي',
+        branch: currentBranch || 'الفرع الرئيسي',
         channel,
         commission: commissionAmount,
       })
       for (const line of cart) {
         const rec = recipes.find((r) => r.itemId === line.id || r.itemName === line.name)
-        if (rec && rec.lines) { for (const rl of rec.lines) { const ing = ingredients.find((x) => x.id === rl.ingredientId || x.name === rl.name); if (ing) await db.incrementShared('ingredients', ing.id, 'stock', -(Number(rl.qty) * line.qty)) } }
+        if (rec && rec.lines) {
+          for (const rl of rec.lines) {
+            const ing = ingredients.find((x) => x.id === rl.ingredientId || x.name === rl.name)
+            if (ing) await db.incrementShared('ingredients', ing.id, 'stock', -(Number(rl.qty) * line.qty))
+          }
+        }
       }
       const earnedPts = Math.floor(total * 10)
       if (cleanPhone.length >= 8) {
@@ -277,17 +297,25 @@ const [lastSentCart, setLastSentCart] = useState([]);
         setActiveTableOrder(null)
       }
       setLastReceipt({ ...inv, lines: cart, phone: cleanPhone, earnedPts, note: orderNote, discount: totalDiscount })
-      setCart([]); setRedeemDiscount(0); setManualDiscount(''); setOrderNote(''); setPhone('')
-    } finally { setBusy(false) }
+      setCart([])
+      setLastSentCart([])
+      setRedeemDiscount(0)
+      setManualDiscount('')
+      setOrderNote('')
+      setPhone('')
+    } finally {
+      setBusy(false)
+    }
   }
 
   function sendWhatsApp(rec) {
     const linesTxt = rec.lines.map((l) => `- ${l.name} × ${l.qty} = ${fmt(l.price * l.qty)} ${currency}`).join('\n')
     const msg = `مرحباً بك في مقهى *${shopName || 'نيوم'}* ☕\nرقم الطلب: *${rec.number}*\nالتاريخ: ${rec.date}\n\n${linesTxt}\n${rec.discount > 0 ? `\nالخصم: -${fmt(rec.discount)} ${currency}` : ''}\n*الإجمالي: ${fmt(rec.total)} ${currency}*\n${rec.earnedPts ? `نقاط الولاء المكتسبة: +${rec.earnedPts} نقطة ⭐\n` : ''}شكراً لزيارتكم!`
     const target = rec.phone ? (rec.phone.startsWith('968') ? rec.phone : `968${rec.phone}`) : ''
-    window.open('https://wa.me' + '/' + target + '?text=' + encodeURIComponent(msg), '_blank')
+    window.open('https://wa.me/' + target + '?text=' + encodeURIComponent(msg), '_blank')
   }
-const [nowTick, setNowTick] = useState(Date.now())
+
+  const [nowTick, setNowTick] = useState(Date.now())
   const prevPendingRef = useRef(pendingOrders.length)
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 15000)
@@ -299,16 +327,19 @@ const [nowTick, setNowTick] = useState(Date.now())
         const ctx = new (window.AudioContext || window.webkitAudioContext)()
         const osc = ctx.createOscillator()
         const gain = ctx.createGain()
-        osc.type = 'sine'; osc.frequency.value = 880
+        osc.type = 'sine'
+        osc.frequency.value = 880
         gain.gain.setValueAtTime(0.15, ctx.currentTime)
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
-        osc.connect(gain); gain.connect(ctx.destination)
-        osc.start(); osc.stop(ctx.currentTime + 0.5)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start()
+        osc.stop(ctx.currentTime + 0.5)
       } catch {}
     }
     prevPendingRef.current = pendingOrders.length
   }, [pendingOrders.length])
-  return (
+            return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2 space-y-3">
         {pendingOrders.length > 0 && (
@@ -319,20 +350,20 @@ const [nowTick, setNowTick] = useState(Date.now())
                 <div key={ord.id} className="bg-white border border-amber-300 p-2.5 rounded-xl text-xs flex items-center gap-3 shadow-sm">
                   <div>
                     <div className="font-extrabold text-[#123B36] flex items-center gap-2">
-                          <span>طاولة {ord.table_num} • {fmt(ord.total)} {currency}</span>
-                          {ord.created_at && (() => {
-                            const mins = Math.max(0, Math.floor((nowTick - new Date(ord.created_at).getTime()) / 60000))
-                            return (
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${mins >= 4 ? 'bg-red-600 text-white animate-pulse' : 'bg-emerald-600/20 text-emerald-700'}`}>
-                                ⏱ {mins} د
-                              </span>
-                            )
-                          })()}
-                        </div>
+                      <span>طاولة {ord.table_num} • {fmt(ord.total)} {currency}</span>
+                      {ord.created_at && (() => {
+                        const mins = Math.max(0, Math.floor((nowTick - new Date(ord.created_at).getTime()) / 60000))
+                        return (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${mins >= 4 ? 'bg-red-600 text-white animate-pulse' : 'bg-emerald-600/20 text-emerald-700'}`}>
+                            ⏱ {mins} د
+                          </span>
+                        )
+                      })()}
+                    </div>
                     <div className="text-[11px] text-[#123B36]/70">{(ord.lines || []).map((l) => `${l.name}×${l.qty}`).join('، ')}</div>
                     {ord.customer_note && <div className="text-[10px] text-amber-700 font-bold">ملاحظة: {ord.customer_note}</div>}
                   </div>
-                  <button onClick={() => { setCart(ord.lines || []); setOrderNote(ord.customer_note || `طاولة ${ord.table_num}`); setActiveTableOrder(ord) }} className="bg-[#123B36] text-white px-3 py-1.5 rounded-lg font-bold">اعتماد</button>
+                  <button onClick={() => { setCart(ord.lines || []); setLastSentCart([]); setOrderNote(ord.customer_note || `طاولة ${ord.table_num}`); setActiveTableOrder(ord) }} className="bg-[#123B36] text-white px-3 py-1.5 rounded-lg font-bold">اعتماد</button>
                   <button onClick={() => db.updateShared('table_orders', ord.id, { status: 'cancelled' })} className="text-red-500 font-bold px-1">✕</button>
                 </div>
               ))}
@@ -354,26 +385,36 @@ const [nowTick, setNowTick] = useState(Date.now())
         )}
 
         <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-2xl shadow-sm">
-          <div className="relative flex-1 min-w-[180px]"><Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#123B36]/40" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث سريع..." className="w-full pr-9 pl-3 py-2 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
+          <div className="relative flex-1 min-w-[180px]"><Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#123B36]/40" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={lang === 'en' ? 'Quick search...' : 'بحث سريع...'} className="w-full pr-9 pl-3 py-2 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
           <div className="flex gap-1.5 overflow-x-auto pb-1">{cats.map((c) => <button key={c} onClick={() => setCat(c)} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${cat === c ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA]'}`}>{c}</button>)}</div>
         </div>
         {filtered.length === 0 ? <div className="bg-white p-8 rounded-2xl text-center text-sm text-[#123B36]/60">لا توجد أصناف بعد.</div> : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">{filtered.map((item) => <button key={item.id} onClick={() => addItem(item)} className="bg-white p-3.5 rounded-2xl shadow-sm border border-[#123B36]/10 text-right flex flex-col justify-between hover:border-[#123B36]/40 transition"><span className="font-bold text-sm">{item.name}</span><span className="text-xs font-extrabold text-[#123B36]/70 mt-2">{fmt(item.price)} {currency}</span></button>)}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+            {filtered.map((item) => (
+              <button key={item.id} onClick={() => addItem(item)} className="bg-white p-3.5 rounded-2xl shadow-sm border border-[#123B36]/10 text-right flex flex-col justify-between hover:border-[#123B36]/40 transition">
+                <div>
+                  <span className="font-bold text-sm block">{lang === 'en' && item.name_en ? item.name_en : item.name}</span>
+                  {item.name_en && <span className="text-[11px] text-[#123B36]/55 block">{lang === 'en' ? item.name : item.name_en}</span>}
+                </div>
+                <span className="text-xs font-extrabold text-[#123B36]/70 mt-2">{fmt(item.price)} {currency}</span>
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
       <div className="bg-white p-4 rounded-2xl shadow-md border border-[#123B36]/10 flex flex-col justify-between h-fit sticky top-20">
         <div>
           <div className="flex items-center justify-between border-b pb-3 mb-3">
-            <h2 className="font-extrabold text-base">الطلب الحالي</h2>
+            <h2 className="font-extrabold text-base">{lang === 'en' ? 'Current Order' : 'الطلب الحالي'}</h2>
             <div className="flex items-center gap-1.5">
-              {cart.length > 0 && <button onClick={holdCurrentOrder} title="تعليق الطلب" className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1"><PauseCircle size={13} /> تعليق</button>}
-              <span className="bg-[#123B36] text-white text-xs font-bold px-2.5 py-1 rounded-lg">طلب {nextOrderNum}</span>
+              {cart.length > 0 && <button onClick={holdCurrentOrder} title="تعليق الطلب" className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1"><PauseCircle size={13} /> {lang === 'en' ? 'Hold' : 'تعليق'}</button>}
+              <span className="bg-[#123B36] text-white text-xs font-bold px-2.5 py-1 rounded-lg">{nextOrderNum}</span>
             </div>
           </div>
 
-         <div className="mb-3 bg-[#F4F1EA] p-2.5 rounded-xl space-y-1.5">
-            <div className="flex items-center gap-2"><Award size={15} className="text-amber-600" /><input value={phone} onChange={(e) => { setPhone(e.target.value); setRedeemDiscount(0) }} placeholder="جوال العميل لنقاط الولاء (اختياري)" className="bg-transparent text-xs w-full outline-none font-bold" /></div>
+          <div className="mb-3 bg-[#F4F1EA] p-2.5 rounded-xl space-y-1.5">
+            <div className="flex items-center gap-2"><Award size={15} className="text-amber-600" /><input value={phone} onChange={(e) => { setPhone(e.target.value); setRedeemDiscount(0) }} placeholder={lang === 'en' ? 'Customer phone (optional)' : 'جوال العميل لنقاط الولاء (اختياري)'} className="bg-transparent text-xs w-full outline-none font-bold" /></div>
             {customer && (
               <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#123B36]/10">
                 <span className="font-bold text-emerald-700">رصيد العميل: {customer.points} نقطة</span>
@@ -386,29 +427,31 @@ const [nowTick, setNowTick] = useState(Date.now())
             )}
           </div>
 
-          {cart.length === 0 ? <p className="text-center text-xs text-[#123B36]/45 py-8">اضغط على الأصناف لإضافتها</p> : (
-            <div className="space-y-2 max-h-56 overflow-y-auto">{cart.map((l, idx) => (
-              <div key={l.id} className="flex items-center justify-between bg-[#F4F1EA] p-2.5 rounded-xl text-xs">
-                <div className="flex-1"><div className="font-bold">{l.name}</div><div className="text-[#123B36]/60">{fmt(l.price)} × {l.qty}</div></div>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: Math.max(1, x.qty - 1) } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">-</button>
-                  <span className="w-5 text-center font-bold">{l.qty}</span>
-                  <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: x.qty + 1 } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">+</button>
-                  <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="text-red-600 p-1"><Trash2 size={15} /></button>
+          {cart.length === 0 ? <p className="text-center text-xs text-[#123B36]/45 py-8">{lang === 'en' ? 'Tap items to add' : 'اضغط على الأصناف لإضافتها'}</p> : (
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {cart.map((l, idx) => (
+                <div key={l.id} className="flex items-center justify-between bg-[#F4F1EA] p-2.5 rounded-xl text-xs">
+                  <div className="flex-1"><div className="font-bold">{lang === 'en' && l.name_en ? l.name_en : l.name}</div><div className="text-[#123B36]/60">{fmt(l.price)} × {l.qty}</div></div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: Math.max(1, x.qty - 1) } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">-</button>
+                    <span className="w-5 text-center font-bold">{l.qty}</span>
+                    <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: x.qty + 1 } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">+</button>
+                    <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="text-red-600 p-1"><Trash2 size={15} /></button>
+                  </div>
                 </div>
-              </div>
-            ))}</div>
+              ))}
+            </div>
           )}
 
           {cart.length > 0 && (
             <div className="grid grid-cols-2 gap-2 mt-3">
               <div className="relative">
                 <StickyNote size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
-                <input value={orderNote} onChange={(e) => setOrderNote(e.target.value)} placeholder="ملاحظة (بدون سكر...)" className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none" />
+                <input value={orderNote} onChange={(e) => setOrderNote(e.target.value)} placeholder={lang === 'en' ? 'Note...' : 'ملاحظة (بدون سكر...)'} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none" />
               </div>
               <div className="relative">
                 <Percent size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
-                <input type="number" step="0.050" min="0" value={manualDiscount} onChange={(e) => setManualDiscount(e.target.value)} placeholder={`خصم (${currency})`} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none font-bold" />
+                <input type="number" step="0.050" min="0" value={manualDiscount} onChange={(e) => setManualDiscount(e.target.value)} placeholder={lang === 'en' ? `Discount (${currency})` : `خصم (${currency})`} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none font-bold" />
               </div>
             </div>
           )}
@@ -416,7 +459,7 @@ const [nowTick, setNowTick] = useState(Date.now())
 
         <div className="border-t pt-3 mt-4 space-y-3">
           <div className="space-y-1.5">
-            <div className="text-[11px] font-bold opacity-75">قناة الطلب / تطبيق التوصيل:</div>
+            <div className="text-[11px] font-bold opacity-75">{lang === 'en' ? 'Channel:' : 'قناة الطلب / تطبيق التوصيل:'}</div>
             <div className="flex flex-wrap gap-1.5">
               {[
                 { name: 'محلي', rate: 0 },
@@ -429,93 +472,7 @@ const [nowTick, setNowTick] = useState(Date.now())
                   key={ch.name}
                   type="button"
                   onClick={() => { setChannel(ch.name); setCommRate(ch.rate) }}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition ${
-                    channel === ch.name
-                      ? 'bg-amber-400 text-slate-950 border-amber-400'
-                      : 'bg-black/20 border-white/10 opacity-75'
-                  }`}
-                >
-                  {ch.name}{ch.rate > 0 ? ` (${ch.rate}%)` : ''}
-                </button>
-              ))}
-            </div>
-            {commissionAmount > 0 && (
-              <div className="text-[11px] text-amber-300 font-bold">
-                عمولة التطبيق ({commRate}%): {fmt(commissionAmount)} {currency} • الصافي: {fmt(total - commissionAmount)} {currency}
-              </div>
-            )}
-          </div>
-          <div className="flex gap-2">{['نقدي', 'بطاقة', 'تحويل'].map((m) => <button key={m} onClick={() => setPayMethod(m)} className={`flex-1 py-2 rounded-xl text-xs font-extrabold border ${payMethod === m ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-black/20 border-white/10 opacity-75'}`}>{lang === 'en' ? (m === 'نقدي' ? 'Cash' : m === 'بطاقة' ? 'Card' : 'Transfer') : m}</button>)}</div>
-        {totalDiscount > 0 && <div className="flex justify-between text-xs font-bold text-amber-700"><span>{lang === 'en' ? 'Discount:' : 'إجمالي الخصم:'}</span><span>-{fmt(totalDiscount)} {currency}</span></div>}
-        <div className="flex justify-between items-center text-lg font-extrabold"><span>{lang === 'en' ? 'Total:' : 'الإجمالي:'}</span><span>{fmt(total)} {currency}</span></div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => printBaristaTicket()}
-            disabled={!cart.length && !lastSentCart.length}
-            className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-[#123B36] font-extrabold text-xs shadow-sm"
-          >
-            {lang === 'en' ? 'Barista KOT' : 'تذكرة باريستا'}
-          </button>
-          <button onClick={checkout} disabled={!cart.length || busy} className="flex-[1.4] py-3 rounded-xl bg-[#123B36] hover:bg-[#123B36]/90 text-white font-extrabold text-sm">
-            {busy ? '...' : (lang === 'en' ? 'Complete Sale' : 'إتمام البيع')}
-          </button>
-      </div>
-    </div>
-      {kotTicket && (
-        <div id="kot-print" className="hidden print:block p-4 text-xs font-sans" dir="ltr">
-          <div className="text-center border-b-2 border-dashed border-black pb-2 mb-2">
-            <h3 className="font-extrabold text-base">{shopName || 'NEOM'} - BARISTA KOT</h3>
-            <p className="font-bold text-[11px]">{kotTicket.date} | {kotTicket.time}</p>
-            <p className="font-bold text-[11px]">Cashier: {kotTicket.cashier} | {kotTicket.channel}</p>
-          </div>
-          {kotTicket.sections.map((sec, sIdx) => (
-            <div key={sIdx} className="mb-3">
-              <div className="bg-black text-white font-extrabold text-center py-1 text-sm mb-1.5">
-                {sec.labelAr} &nbsp; {sec.labelEn}
-              </div>
-              {sec.lines.map((l, idx) => (
-                <div key={idx} className="flex justify-between items-start border-b border-dotted border-black/40 py-1.5">
-                  <div className="text-left">
-                    <div className="font-extrabold text-sm">{l.name_en || l.name}</div>
-                    {l.name_en && <div className="font-bold text-xs text-right" dir="rtl">{l.name}</div>}
-                  </div>
-                  <div className="font-extrabold text-base pl-3">x{l.qty}</div>
-                </div>
-              ))}
-            </div>
-          ))}
-          {kotTicket.note && <div className="border-t border-black pt-1.5 font-extrabold text-center">Note: {kotTicket.note}</div>}
-        </div>
-      )}
-
-      {lastReceipt && !kotTicket && (
-        <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl space-y-2 text-xs">
-          <div className="flex items-center justify-between"><span className="font-extrabold text-emerald-800">{lang === 'en' ? `Saved #${lastReceipt.number}` : `تم حفظ الفاتورة #${lastReceipt.number}`}</span></div>
-          <div className="flex gap-2">
-            <button onClick={() => window.print()} className="flex-1 flex items-center justify-center gap-1 bg-[#123B36] text-white py-2 rounded-lg font-extrabold">{lang === 'en' ? 'Print Receipt' : 'طباعة الإيصال'}</button>
-            <button onClick={() => sendWhatsApp(lastReceipt)} className="flex-1 flex items-center justify-center gap-1 bg-emerald-600 text-white py-2 rounded-lg font-extrabold">WhatsApp</button>
-          </div>
-        </div>
-      )}
-
-      {lastReceipt && !kotTicket && (
-        <div id="receipt-print" className="hidden print:block p-4 text-center text-xs" dir="rtl">
-          <h3 className="font-bold text-base">{shopName || 'نيوم'}</h3>
-          <p>طلب: {lastReceipt.number} | {lastReceipt.date}</p>
-          {lastReceipt.note && <p className="font-bold mt-1">ملاحظة: {lastReceipt.note}</p>}
-          <hr className="my-2" />
-          {lastReceipt.lines.map((l) => <div key={l.id} className="flex justify-between my-1"><span>{l.name} × {l.qty}</span><span>{fmt(l.price * l.qty)}</span></div>)}
-          <hr className="my-2" />
-          {lastReceipt.discount > 0 && <div className="flex justify-between my-1"><span>الخصم:</span><span>-{fmt(lastReceipt.discount)}</span></div>}
-          <p className="font-bold">الإجمالي: {fmt(lastReceipt.total)} {currency}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function BaristaScreen({ invoices = [], currentBranch, showBranch }) {
+                  function BaristaScreen({ invoices = [], currentBranch, showBranch }) {
   const [doneIds, setDoneIds] = useState([])
   const todayOrders = invoices.filter((i) => i.date === todayStr() && !doneIds.includes(i.id) && (!showBranch || !i.branch || i.branch === currentBranch))
 
@@ -558,16 +515,33 @@ function BaristaScreen({ invoices = [], currentBranch, showBranch }) {
 }
 
 function MaterialsScreen({ ingredients, shipments = [], currency, isManager, features = {}, currentBranch = 'الفرع الرئيسي - صلالة' }) {
-  const [material, setMaterial] = useState(''); const [qty, setQty] = useState(''); const [unit, setUnit] = useState('كيلو'); const [price, setPrice] = useState(''); const [supplier, setSupplier] = useState(''); const [payStatus, setPayStatus] = useState('مدفوع'); const [expiryDate, setExpiryDate] = useState(''); const [done, setDone] = useState(false)
+  const [material, setMaterial] = useState('')
+  const [qty, setQty] = useState('')
+  const [unit, setUnit] = useState('كيلو')
+  const [price, setPrice] = useState('')
+  const [supplier, setSupplier] = useState('')
+  const [payStatus, setPayStatus] = useState('مدفوع')
+  const [expiryDate, setExpiryDate] = useState('')
+  const [done, setDone] = useState(false)
+
   async function handleSave(e) {
-    e.preventDefault(); if (!material || !qty) return
-    const numQty = Number(qty); const baseQty = numQty * ((unit === 'كيلو' || unit === 'لتر') ? 1000 : 1)
-    const baseUnit = unit === 'كيلو' ? 'جم' : unit === 'لتر' ? 'مل' : unit; const totalCost = Number(price || 0); const unitCost = baseQty > 0 ? totalCost / baseQty : 0
+    e.preventDefault()
+    if (!material || !qty) return
+    const numQty = Number(qty)
+    const baseQty = numQty * ((unit === 'كيلو' || unit === 'لتر') ? 1000 : 1)
+    const baseUnit = unit === 'كيلو' ? 'جم' : unit === 'لتر' ? 'مل' : unit
+    const totalCost = Number(price || 0)
+    const unitCost = baseQty > 0 ? totalCost / baseQty : 0
     await db.insertShared('shipments', { date: todayStr(), material: material.trim(), supplier: supplier.trim(), qty: numQty, unit, price: totalCost, total: totalCost, pay_status: payStatus, expiry_date: expiryDate || null, branch: currentBranch })
     const existing = ingredients.find((i) => i.name.trim() === material.trim())
-    if (existing) { await db.incrementShared('ingredients', existing.id, 'stock', baseQty); if (unitCost > 0) await db.updateShared('ingredients', existing.id, { cost: unitCost }) }
-    else { await db.insertShared('ingredients', { name: material.trim(), unit: baseUnit, stock: baseQty, cost: unitCost, minStock: 500 }) }
-    setMaterial(''); setQty(''); setPrice(''); setSupplier(''); setExpiryDate(''); setDone(true); setTimeout(() => setDone(false), 3000)
+    if (existing) {
+      await db.incrementShared('ingredients', existing.id, 'stock', baseQty)
+      if (unitCost > 0) await db.updateShared('ingredients', existing.id, { cost: unitCost })
+    } else {
+      await db.insertShared('ingredients', { name: material.trim(), unit: baseUnit, stock: baseQty, cost: unitCost, minStock: 500 })
+    }
+    setMaterial(''); setQty(''); setPrice(''); setSupplier(''); setExpiryDate(''); setDone(true)
+    setTimeout(() => setDone(false), 3000)
   }
 
   const totalPurchases = shipments.reduce((s, x) => s + Number(x.total || x.price || 0), 0)
@@ -630,7 +604,7 @@ function MaterialsScreen({ ingredients, shipments = [], currency, isManager, fea
     </div>
   )
 }
-function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
+              function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
   const [cashInput, setCashInput] = useState('')
   const todayInvoices = (invoices || []).filter((i) => i.date === todayStr())
   const cashSales = todayInvoices.filter((i) => i.paymentMethod === 'نقدي').reduce((s, i) => s + Number(i.total || 0), 0)
@@ -651,13 +625,13 @@ function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
       <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4">
         <div className="flex justify-between items-center border-b pb-3"><h3 className="font-extrabold text-base">{openShift ? 'إغلاق الوردية ومطابقة الصندوق' : 'فتح وردية جديدة'}</h3><button onClick={onClose}><X size={18} /></button></div>
         {openShift ? (
-         <div className="space-y-3 text-xs">
+          <div className="space-y-3 text-xs">
             <div className="bg-[#F4F1EA] p-3 rounded-xl space-y-1.5">
               <div className="flex justify-between"><span>الرصيد الافتتاحي:</span><b>{fmt(openShift.opening_cash)} {currency}</b></div>
               <div className="flex justify-between"><span>مبيعات الكاش اليوم:</span><b>{fmt(cashSales)} {currency}</b></div>
               <div className="flex justify-between"><span>مبيعات البطاقة/التحويل:</span><b>{fmt(cardSales)} {currency}</b></div>
               <div className="flex justify-between border-t pt-1.5 font-extrabold"><span>إجمالي مبيعات اليوم ({todayInvoices.length} فاتورة):</span><b>{fmt(cashSales + cardSales)} {currency}</b></div>
-              <div className="flex justify-between text-sm text-emerald-500 pt-1"><span>الكاش المتوقع بالدرج:</span><b>{fmt(Number(openShift.opening_cash || 0) + cashSales)} {currency}</b></div>
+              <div className="flex justify-between text-sm text-emerald-600 pt-1"><span>الكاش المتوقع بالدرج:</span><b>{fmt(Number(openShift.opening_cash || 0) + cashSales)} {currency}</b></div>
             </div>
             <div>
               <label className="block font-bold mb-1">الكاش الفعلي المعدود في الدرج ({currency})</label>
@@ -665,7 +639,7 @@ function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
               {cashInput !== '' && (() => {
                 const diff = Number(cashInput) - (Number(openShift.opening_cash || 0) + cashSales)
                 return (
-                  <div className={`mt-1.5 text-[11px] font-extrabold px-2.5 py-1 rounded-lg ${diff === 0 ? 'bg-emerald-500/15 text-emerald-400' : diff > 0 ? 'bg-amber-500/15 text-amber-300' : 'bg-red-500/15 text-red-400'}`}>
+                  <div className={`mt-1.5 text-[11px] font-extrabold px-2.5 py-1 rounded-lg ${diff === 0 ? 'bg-emerald-500/15 text-emerald-700' : diff > 0 ? 'bg-amber-500/15 text-amber-800' : 'bg-red-500/15 text-red-700'}`}>
                     {diff === 0 ? '✓ الصندوق مطابق تماماً (0.000)' : diff > 0 ? `زيادة في الصندوق: +${fmt(diff)} ${currency}` : `عجز في الصندوق: ${fmt(diff)} ${currency}`}
                   </div>
                 )
@@ -728,17 +702,32 @@ function QrMenuModal({ shopName, onClose }) {
     </div>
   )
 }
-    function PublicQrMenu({ items, shopName, currency, showFeedback = true }) {
-  const [cart, setCart] = useState([]); const [note, setNote] = useState(''); const [sent, setSent] = useState(false); const [busy, setBusy] = useState(false)
-  const [rating, setRating] = useState(5); const [fbComment, setFbComment] = useState(''); const [fbSent, setFbSent] = useState(false)
+              function PublicQrMenu({ items, shopName, currency, showFeedback = true }) {
+  const [cart, setCart] = useState([])
+  const [note, setNote] = useState('')
+  const [sent, setSent] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [rating, setRating] = useState(5)
+  const [fbComment, setFbComment] = useState('')
+  const [fbSent, setFbSent] = useState(false)
   const [activeCat, setActiveCat] = useState('الكل')
- const [tableNum, setTableNum] = useState(() => new URLSearchParams(window.location.search).get('table') || '1')
+  const [tableNum, setTableNum] = useState(() => new URLSearchParams(window.location.search).get('table') || '1')
+  const [qrLang, setQrLang] = useState('ar')
+
   const cats = ['الكل', ...new Set(items.map((i) => i.category).filter(Boolean))]
   const total = cart.reduce((s, l) => s + l.price * l.qty, 0)
   const totalCount = cart.reduce((s, l) => s + l.qty, 0)
 
   function add(it) {
-    setCart((p) => { const idx = p.findIndex((x) => x.id === it.id); if (idx > -1) { const c = [...p]; c[idx].qty += 1; return c } return [...p, { id: it.id, name: it.name, price: Number(it.price), qty: 1 }] })
+    setCart((p) => {
+      const idx = p.findIndex((x) => x.id === it.id)
+      if (idx > -1) {
+        const c = [...p]
+        c[idx].qty += 1
+        return c
+      }
+      return [...p, { id: it.id, name: it.name, name_en: it.name_en || '', price: Number(it.price), qty: 1 }]
+    })
   }
 
   function dec(id) {
@@ -746,11 +735,16 @@ function QrMenuModal({ shopName, onClose }) {
   }
 
   async function sendOrder() {
-    if (!cart.length || busy) return; setBusy(true)
+    if (!cart.length || busy) return
+    setBusy(true)
     try {
       await db.insertShared('table_orders', { table_num: tableNum, lines: cart, total, customer_note: note, status: 'pending' })
-      setSent(true); setCart([]); setNote('')
-    } finally { setBusy(false) }
+      setSent(true)
+      setCart([])
+      setNote('')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function sendFeedback(e) {
@@ -760,8 +754,7 @@ function QrMenuModal({ shopName, onClose }) {
   }
 
   const shownCats = activeCat === 'الكل' ? cats.filter((c) => c !== 'الكل') : [activeCat]
-const [qrLang, setQrLang] = useState('ar');
-  return (
+              return (
     <div className="min-h-screen bg-[#F4F1EA] text-[#123B36] pb-32" dir={qrLang === 'en' ? 'ltr' : 'rtl'}>
       <header className="bg-gradient-to-l from-[#123B36] to-[#1a524b] text-white p-5 text-center sticky top-0 z-20 shadow-md">
         <h1 className="font-extrabold text-2xl tracking-wide">{shopName}</h1>
@@ -795,7 +788,7 @@ const [qrLang, setQrLang] = useState('ar');
               onClick={() => setActiveCat(c)}
               className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition ${activeCat === c ? 'bg-[#123B36] text-white shadow-xs' : 'bg-white text-[#123B36]/80 border border-[#123B36]/10'}`}
             >
-              {c}
+              {c === 'الكل' && qrLang === 'en' ? 'All' : c}
             </button>
           ))}
         </div>
@@ -804,22 +797,22 @@ const [qrLang, setQrLang] = useState('ar');
       {sent ? (
         <div className="max-w-md mx-auto mt-8 mx-4 p-6 bg-white rounded-3xl text-center space-y-4 shadow-lg border border-[#123B36]/10">
           <CheckCircle2 size={48} className="mx-auto text-emerald-600" />
-          <h2 className="font-extrabold text-lg">تم إرسال طلبك للكاشير بنجاح!</h2>
-          <p className="text-xs text-[#123B36]/70">سيتم تحضير مشروباتك وتقديمها لطاولتك حالاً.</p>
+          <h2 className="font-extrabold text-lg">{qrLang === 'en' ? 'Order Sent to Barista!' : 'تم إرسال طلبك للكاشير بنجاح!'}</h2>
+          <p className="text-xs text-[#123B36]/70">{qrLang === 'en' ? 'Your drinks are being prepared shortly.' : 'سيتم تحضير مشروباتك وتقديمها لطاولتك حالاً.'}</p>
           {showFeedback && !fbSent && (
             <form onSubmit={sendFeedback} className="bg-[#F4F1EA] p-4 rounded-2xl space-y-2.5 text-right">
-              <div className="font-extrabold text-xs text-center">قيّم تجربتك معنا ☕</div>
+              <div className="font-extrabold text-xs text-center">{qrLang === 'en' ? 'Rate your experience ☕' : 'قيّم تجربتك معنا ☕'}</div>
               <div className="flex justify-center gap-2 text-2xl">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button type="button" key={n} onClick={() => setRating(n)} className={`transition ${n <= rating ? 'opacity-100 scale-110' : 'opacity-30'}`}>⭐</button>
                 ))}
               </div>
-              <input value={fbComment} onChange={(e) => setFbComment(e.target.value)} placeholder="اكتب ملاحظتك أو اقتراحك (اختياري)..." className="w-full bg-white p-2.5 rounded-xl text-xs outline-none" />
-              <button type="submit" className="w-full py-2.5 rounded-xl bg-amber-500 text-[#123B36] font-extrabold text-xs">إرسال التقييم</button>
+              <input value={fbComment} onChange={(e) => setFbComment(e.target.value)} placeholder={qrLang === 'en' ? 'Write a note (optional)...' : 'اكتب ملاحظتك أو اقتراحك (اختياري)...'} className="w-full bg-white p-2.5 rounded-xl text-xs outline-none" />
+              <button type="submit" className="w-full py-2.5 rounded-xl bg-amber-500 text-[#123B36] font-extrabold text-xs">{qrLang === 'en' ? 'Send Rating' : 'إرسال التقييم'}</button>
             </form>
           )}
-          {fbSent && <div className="text-xs font-extrabold text-emerald-700 bg-emerald-50 py-2 rounded-xl">شكراً لتقييمك الجميل! ❤️</div>}
-          <button onClick={() => { setSent(false); setFbSent(false) }} className="bg-[#123B36] text-white px-6 py-2.5 rounded-xl text-xs font-bold">طلب أصناف إضافية</button>
+          {fbSent && <div className="text-xs font-extrabold text-emerald-700 bg-emerald-50 py-2 rounded-xl">{qrLang === 'en' ? 'Thank you for your feedback! ❤️' : 'شكراً لتقييمك الجميل! ❤️'}</div>}
+          <button onClick={() => { setSent(false); setFbSent(false) }} className="bg-[#123B36] text-white px-6 py-2.5 rounded-xl text-xs font-bold">{qrLang === 'en' ? 'Order More' : 'طلب أصناف إضافية'}</button>
         </div>
       ) : (
         <div className="max-w-2xl mx-auto p-4 space-y-6">
@@ -833,8 +826,8 @@ const [qrLang, setQrLang] = useState('ar');
                 {items.filter((i) => i.category === c).map((it) => {
                   const inCart = cart.find((x) => x.id === it.id)
                   return (
-<div key={it.id} className={`bg-white p-3.5 rounded-2xl shadow-sm border transition flex flex-col justify-between items-center text-center gap-3 ${inCart ? 'border-amber-400/70' : 'border-white/10'}`}>
-                    <div>
+                    <div key={it.id} className={`bg-white p-3.5 rounded-2xl shadow-sm border transition flex flex-col justify-between items-center text-center gap-3 ${inCart ? 'border-amber-400/70' : 'border-white/10'}`}>
+                      <div>
                         <div className="font-extrabold text-sm text-[#123B36]">{qrLang === 'en' && it.name_en ? it.name_en : it.name}</div>
                         {it.name_en && <div className="text-[11px] text-[#123B36]/55 mt-0.5">{qrLang === 'en' ? it.name : it.name_en}</div>}
                         <div className="text-xs font-extrabold text-amber-700 mt-1">{fmt(it.price)} {currency}</div>
@@ -846,7 +839,9 @@ const [qrLang, setQrLang] = useState('ar');
                           <button type="button" onClick={() => add(it)} className="w-8 h-8 bg-[#123B36] text-white rounded-lg font-extrabold shadow-xs text-base">+</button>
                         </div>
                       ) : (
-                        <button type="button" onClick={() => add(it)} className="bg-[#123B36] hover:bg-[#1a524b] text-white px-4 py-2 rounded-xl text-xs font-extrabold shadow-xs">+ أضف</button>
+                        <button type="button" onClick={() => add(it)} className="bg-[#123B36] hover:bg-[#1a524b] text-white px-4 py-2 rounded-xl text-xs font-extrabold shadow-xs">
+                          {qrLang === 'en' ? '+ Add' : '+ أضف'}
+                        </button>
                       )}
                     </div>
                   )
@@ -860,14 +855,14 @@ const [qrLang, setQrLang] = useState('ar');
       {cart.length > 0 && !sent && (
         <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-[#123B36]/15 p-3.5 shadow-2xl z-30 rounded-t-3xl">
           <div className="max-w-2xl mx-auto space-y-2.5">
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظات للباريستا (بدون سكر، ثلج زيادة...)" className="w-full bg-[#F4F1EA] px-3.5 py-2.5 rounded-xl text-xs outline-none font-bold" />
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={qrLang === 'en' ? 'Barista notes (less sugar, extra ice...)' : 'ملاحظات للباريستا (بدون سكر، ثلج زيادة...)'} className="w-full bg-[#F4F1EA] px-3.5 py-2.5 rounded-xl text-xs outline-none font-bold" />
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[11px] text-[#123B36]/60 font-bold">{totalCount} أصناف مختارة</div>
+                <div className="text-[11px] text-[#123B36]/60 font-bold">{totalCount} {qrLang === 'en' ? 'items selected' : 'أصناف مختارة'}</div>
                 <div className="text-base font-extrabold text-[#123B36]">{fmt(total)} {currency}</div>
               </div>
               <button onClick={sendOrder} disabled={busy} className="bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-3 rounded-2xl text-sm font-extrabold shadow-md">
-                {busy ? 'جاري الإرسال...' : 'إرسال الطلب الآن'}
+                {busy ? (qrLang === 'en' ? 'Sending...' : 'جاري الإرسال...') : (qrLang === 'en' ? 'Send Order Now' : 'إرسال الطلب الآن')}
               </button>
             </div>
           </div>
