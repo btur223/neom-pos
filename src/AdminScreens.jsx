@@ -395,17 +395,17 @@ export function DashboardScreen({ invoices, ingredients, recipes, settings, feat
 
   const totalExpenses = periodExpenses.reduce((s, e) => s + Number(e.amount || 0), 0)
   const totalWaste = periodWasteLogs.reduce((s, w) => s + Number(w.cost_loss || 0), 0)
-  const lowStock = ingredients.filter((ing) => Number(ing.stock || 0) <= Number(ing.minStock || 0))
+  const lowStock = (ingredients || []).filter((ing) => Number(ing.stock || 0) <= Number(ing.minStock || 500))
 
   const ingCostMap = useMemo(() => {
     const m = {}
-    ingredients.forEach((ing) => { m[ing.name] = Number(ing.cost || 0) })
+    ;(ingredients || []).forEach((ing) => { m[ing.name] = Number(ing.cost || 0) })
     return m
   }, [ingredients])
 
   const recipeCostMap = useMemo(() => {
     const m = {}
-    recipes.forEach((rec) => {
+    ;(recipes || []).forEach((rec) => {
       const c = (rec.lines || []).reduce((sum, l) => sum + (Number(l.qty || 0) * (ingCostMap[l.name] || 0)), 0)
       m[rec.itemName] = c
     })
