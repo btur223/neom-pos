@@ -460,8 +460,8 @@ const [nowTick, setNowTick] = useState(Date.now())
           <button onClick={checkout} disabled={!cart.length || busy} className="flex-[1.4] py-3 rounded-xl bg-[#123B36] hover:bg-[#123B36]/90 text-white font-extrabold text-sm">
             {busy ? '...' : (lang === 'en' ? 'Complete Sale' : 'إتمام البيع')}
           </button>
-        </div>
-</div>
+      </div>
+    </div>
       {kotTicket && (
         <div id="kot-print" className="hidden print:block p-4 text-xs font-sans" dir="ltr">
           <div className="text-center border-b-2 border-dashed border-black pb-2 mb-2">
