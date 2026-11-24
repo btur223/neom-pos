@@ -223,8 +223,8 @@ const [cat, setCat] = useState('الكل')
   }
 
   const pendingOrders = (tableOrders || []).filter((o) => o.status === 'pending')
-  const cats = useMemo(() => ['الكل', ...new Set(items.map((i) => i.category).filter(Boolean))], [items])
-  const filtered = useMemo(() => items.filter((i) => (cat === 'الكل' || i.category === cat) && (!q || i.name.includes(q) || (i.name_en && i.name_en.toLowerCase().includes(q.toLowerCase())))), [items, cat, q])
+const cats = useMemo(() => ['الكل', ...new Set((items || []).map((i) => i.category).filter(Boolean))], [items])
+  const filtered = useMemo(() => (items || []).filter((i) => (cat === 'الكل' || i.category === cat) && (!q || i.name.includes(q) || (i.name_en && i.name_en.toLowerCase().includes(q.toLowerCase())))), [items, cat, q])
   const cleanPhone = phone.replace(/\D/g, '')
   const customer = useMemo(() => cleanPhone.length >= 8 ? (customers || []).find((c) => c.phone === cleanPhone) : null, [customers, cleanPhone])
 
@@ -233,7 +233,7 @@ const [cat, setCat] = useState('الكل')
   const totalDiscount = redeemDiscount + extraDiscount
   const total = Math.max(0, subTotal - totalDiscount)
   const commissionAmount = Number(((total * commRate) / 100).toFixed(3))
-  const nextOrderNum = `#${String(invoices.filter((inv) => inv.date === todayStr()).length + 1).padStart(2, '0')}`
+  const nextOrderNum = `#${String((invoices || []).filter((inv) => inv.date === todayStr()).length + 1).padStart(2, '0')}`
 
   function addItem(item) {
     setCart((prev) => {
