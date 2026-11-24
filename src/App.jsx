@@ -48,7 +48,6 @@ export default function App() {
 
   if (isQrMenu) return <PublicQrMenu items={items} shopName={settings.shopName || 'نيوم'} currency={settings.currency || 'ر.ع'} showFeedback={f.feedback} />
   if (!user) return <TeamLogin appName={settings.shopName || 'نيوم'} onSignedIn={() => setUser(auth.getCurrentUser())} />
-
   const lowStockItems = (ingredients || []).filter((i) => Number(i.stock || 0) <= Number(i.minStock || 500))
   const expiringItems = f.expiryCredit ? (shipments || []).filter((s) => s.expiry_date && ((new Date(s.expiry_date) - new Date(todayStr())) / (1000 * 60 * 60 * 24)) <= 5 && ((new Date(s.expiry_date) - new Date(todayStr())) / (1000 * 60 * 60 * 24)) >= -2) : []
   const openShift = (shifts || []).find((s) => s.status === 'open')
@@ -102,11 +101,7 @@ export default function App() {
               <Clock size={13} /><span>{openShift ? (lang === 'en' ? 'Shift Open' : 'الوردية مفتوحة') : (lang === 'en' ? 'Open Shift' : 'فتح وردية')}</span>
             </button>
           )}
-          <button
-            type="button"
-            onClick={toggleLang}
-            className="text-xs bg-amber-400 text-slate-950 px-2.5 py-1 rounded-full font-extrabold hover:bg-amber-300 transition"
-          >
+          <button type="button" onClick={toggleLang} className="text-xs bg-amber-400 text-slate-950 px-2.5 py-1 rounded-full font-extrabold hover:bg-amber-300 transition">
             {lang === 'ar' ? 'EN' : 'عربي'}
           </button>
         </div>
@@ -147,7 +142,26 @@ export default function App() {
                 واتساب النواقص 📲
               </button>
             )}
-            function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOrders = [], user, currency, shopName, cashierName, currentBranch, showBranch, lang = 'ar' }) {
+            {isManager && <button onClick={() => setTab('inventory')} className="underline">عرض المخزن</button>}
+          </div>
+        </div>
+      )}
+
+      <main className="flex-1 p-4 max-w-7xl w-full mx-auto">
+        {activeTab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} customers={customers} tableOrders={tableOrders} user={user} currency={settings.currency || 'ر.ع'} shopName={settings.shopName || 'نيوم'} cashierName={user.displayName} currentBranch={currentBranch} showBranch={f.branches} lang={lang} />}
+        {activeTab === 'barista' && f.barista && <BaristaScreen invoices={invoices} currentBranch={currentBranch} showBranch={f.branches} />}
+        {activeTab === 'materials' && <MaterialsScreen ingredients={ingredients} shipments={shipments} currency={settings.currency || 'ر.ع'} isManager={isManager} features={f} currentBranch={currentBranch} />}
+        {activeTab === 'dashboard' && <DashboardScreen invoices={invoices} shipments={shipments} ingredients={ingredients} customers={customers} shifts={shifts} currency={settings.currency || 'ر.ع'} currentBranch={currentBranch} showBranch={f.branches} />}
+        {activeTab === 'inventory' && <InventoryScreen items={items} ingredients={ingredients} recipes={recipes} currency={settings.currency || 'ر.ع'} />}
+        {activeTab === 'settings' && <SettingsScreen settings={settings} isManager={isManager} />}
+      </main>
+
+      {showShiftModal && <ShiftModal openShift={openShift} shifts={shifts} invoices={invoices} user={user} currency={settings.currency || 'ر.ع'} onClose={() => setShowShiftModal(false)} />}
+      {showQrModal && <QrMenuModal shopName={settings.shopName || 'نيوم'} onClose={() => setShowQrModal(false)} />}
+    </div>
+  )
+}
+function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOrders = [], user, currency, shopName, cashierName, currentBranch, showBranch, lang = 'ar' }) {
   const [cat, setCat] = useState('الكل')
   const [q, setQ] = useState('')
   const [cart, setCart] = useState([])
@@ -312,7 +326,7 @@ export default function App() {
     const linesTxt = rec.lines.map((l) => `- ${l.name} × ${l.qty} = ${fmt(l.price * l.qty)} ${currency}`).join('\n')
     const msg = `مرحباً بك في مقهى *${shopName || 'نيوم'}* ☕\nرقم الطلب: *${rec.number}*\nالتاريخ: ${rec.date}\n\n${linesTxt}\n${rec.discount > 0 ? `\nالخصم: -${fmt(rec.discount)} ${currency}` : ''}\n*الإجمالي: ${fmt(rec.total)} ${currency}*\n${rec.earnedPts ? `نقاط الولاء المكتسبة: +${rec.earnedPts} نقطة ⭐\n` : ''}شكراً لزيارتكم!`
     const target = rec.phone ? (rec.phone.startsWith('968') ? rec.phone : `968${rec.phone}`) : ''
-    window.open('https://wa.me/' + target + '?text=' + encodeURIComponent(msg), '_blank')
+    window.open('https://wa.me' + target + '?text=' + encodeURIComponent(msg), '_blank')
   }
 
   const [nowTick, setNowTick] = useState(Date.now())
@@ -339,7 +353,7 @@ export default function App() {
     }
     prevPendingRef.current = pendingOrders.length
   }, [pendingOrders.length])
-            return (
+  return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2 space-y-3">
         {pendingOrders.length > 0 && (
@@ -388,6 +402,7 @@ export default function App() {
           <div className="relative flex-1 min-w-[180px]"><Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#123B36]/40" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={lang === 'en' ? 'Quick search...' : 'بحث سريع...'} className="w-full pr-9 pl-3 py-2 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
           <div className="flex gap-1.5 overflow-x-auto pb-1">{cats.map((c) => <button key={c} onClick={() => setCat(c)} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${cat === c ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA]'}`}>{c}</button>)}</div>
         </div>
+
         {filtered.length === 0 ? <div className="bg-white p-8 rounded-2xl text-center text-sm text-[#123B36]/60">لا توجد أصناف بعد.</div> : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
             {filtered.map((item) => (
@@ -402,7 +417,6 @@ export default function App() {
           </div>
         )}
       </div>
-
       <div className="bg-white p-4 rounded-2xl shadow-md border border-[#123B36]/10 flex flex-col justify-between h-fit sticky top-20">
         <div>
           <div className="flex items-center justify-between border-b pb-3 mb-3">
@@ -427,16 +441,19 @@ export default function App() {
             )}
           </div>
 
-          {cart.length === 0 ? <p className="text-center text-xs text-[#123B36]/45 py-8">{lang === 'en' ? 'Tap items to add' : 'اضغط على الأصناف لإضافتها'}</p> : (
-            <div className="space-y-2 max-h-56 overflow-y-auto">
+          {cart.length === 0 ? <p className="text-center text-xs text-[#123B36]/50 py-8">{lang === 'en' ? 'Tap items to add' : 'اضغط على الأصناف لإضافتها'}</p> : (
+            <div className="space-y-2 max-h-60 overflow-y-auto mb-3">
               {cart.map((l, idx) => (
                 <div key={l.id} className="flex items-center justify-between bg-[#F4F1EA] p-2.5 rounded-xl text-xs">
-                  <div className="flex-1"><div className="font-bold">{lang === 'en' && l.name_en ? l.name_en : l.name}</div><div className="text-[#123B36]/60">{fmt(l.price)} × {l.qty}</div></div>
+                  <div>
+                    <div className="font-bold">{lang === 'en' && l.name_en ? l.name_en : l.name}</div>
+                    <div className="text-[#123B36]/60">{fmt(l.price)} × {l.qty}</div>
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: Math.max(1, x.qty - 1) } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">-</button>
-                    <span className="w-5 text-center font-bold">{l.qty}</span>
+                    <span className="font-bold w-4 text-center">{l.qty}</span>
                     <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: x.qty + 1 } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">+</button>
-                    <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="text-red-600 p-1"><Trash2 size={15} /></button>
+                    <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="text-red-600 p-1"><Trash2 size={14} /></button>
                   </div>
                 </div>
               ))}
@@ -444,7 +461,7 @@ export default function App() {
           )}
 
           {cart.length > 0 && (
-            <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="relative">
                 <StickyNote size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
                 <input value={orderNote} onChange={(e) => setOrderNote(e.target.value)} placeholder={lang === 'en' ? 'Note...' : 'ملاحظة (بدون سكر...)'} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none" />
@@ -457,9 +474,9 @@ export default function App() {
           )}
         </div>
 
-        <div className="border-t pt-3 mt-4 space-y-3">
-          <div className="space-y-1.5">
-            <div className="text-[11px] font-bold opacity-75">{lang === 'en' ? 'Channel:' : 'قناة الطلب / تطبيق التوصيل:'}</div>
+        <div className="border-t pt-3 space-y-2.5">
+          <div className="space-y-1">
+            <span className="text-[11px] font-bold opacity-75">{lang === 'en' ? 'Channel:' : 'قناة الطلب / تطبيق التوصيل:'}</span>
             <div className="flex flex-wrap gap-1.5">
               {[
                 { name: 'محلي', rate: 0 },
@@ -472,39 +489,117 @@ export default function App() {
                   key={ch.name}
                   type="button"
                   onClick={() => { setChannel(ch.name); setCommRate(ch.rate) }}
-                  function BaristaScreen({ invoices = [], currentBranch, showBranch }) {
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition ${channel === ch.name ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-[#F4F1EA] border-[#123B36]/10 opacity-75'}`}
+                >
+                  {ch.name}{ch.rate > 0 ? ` (${ch.rate}%)` : ''}
+                </button>
+              ))}
+            </div>
+            {commissionAmount > 0 && (
+              <div className="text-[10px] font-bold text-amber-700">
+                عمولة التطبيق ({commRate}%): {fmt(commissionAmount)} {currency} • الصافي: {fmt(total - commissionAmount)} {currency}
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-1.5">
+            {['نقدي', 'بطاقة', 'تحويل'].map((m) => (
+              <button key={m} onClick={() => setPayMethod(m)} className={`flex-1 py-2 rounded-xl text-xs font-extrabold border ${payMethod === m ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-[#F4F1EA] border-[#123B36]/10 opacity-75'}`}>
+                {lang === 'en' ? (m === 'نقدي' ? 'Cash' : m === 'بطاقة' ? 'Card' : 'Transfer') : m}
+              </button>
+            ))}
+          </div>
+
+          {totalDiscount > 0 && (
+            <div className="flex justify-between text-xs font-bold text-red-600">
+              <span>{lang === 'en' ? 'Discount:' : 'إجمالي الخصم:'}</span>
+              <span>-{fmt(totalDiscount)} {currency}</span>
+            </div>
+          )}
+
+          <div className="flex justify-between font-extrabold text-lg">
+            <span>{lang === 'en' ? 'Total:' : 'الإجمالي:'}</span>
+            <span>{fmt(total)} {currency}</span>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => printBaristaTicket()}
+              disabled={!cart.length && !lastSentCart.length}
+              className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-[#123B36] font-extrabold text-xs shadow-sm disabled:opacity-40"
+            >
+              {lang === 'en' ? 'Barista KOT' : 'تذكرة باريستا'}
+            </button>
+            <button onClick={checkout} disabled={!cart.length || busy} className="flex-[1.4] py-3 rounded-xl bg-[#123B36] hover:bg-[#123B36]/90 text-white font-extrabold text-sm disabled:opacity-40">
+              {busy ? '...' : (lang === 'en' ? 'Complete Sale' : 'إتمام البيع')}
+            </button>
+          </div>
+        </div>
+
+        {kotTicket && (
+          <div className="mt-3 p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs space-y-2 print:block">
+            <div className="font-extrabold text-center border-b pb-1">{shopName || 'NEOM'} - BARISTA KOT</div>
+            <div className="text-[11px] flex justify-between"><span>{kotTicket.date} | {kotTicket.time}</span><span>{kotTicket.channel}</span></div>
+            <div className="text-[11px]">Cashier: {kotTicket.cashier}</div>
+            {kotTicket.sections.map((sec, sIdx) => (
+              <div key={sIdx} className="border-t pt-1">
+                <div className="font-extrabold text-amber-800">{sec.labelAr} / {sec.labelEn}</div>
+                {sec.lines.map((l, idx) => (
+                  <div key={idx} className="flex justify-between font-bold">
+                    <span>{l.name_en || l.name} {l.name_en ? `(${l.name})` : ''}</span>
+                    <span>x{l.qty}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+            {kotTicket.note && <div className="font-bold text-red-700 border-t pt-1">Note: {kotTicket.note}</div>}
+          </div>
+        )}
+
+        {lastReceipt && !kotTicket && (
+          <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-2">
+            <div className="font-extrabold text-emerald-800">{lang === 'en' ? `Saved #${lastReceipt.number}` : `تم حفظ الفاتورة #${lastReceipt.number}`}</div>
+            <div className="flex gap-2">
+              <button onClick={() => window.print()} className="flex-1 flex items-center justify-center gap-1 bg-[#123B36] text-white py-2 rounded-lg font-extrabold">{lang === 'en' ? 'Print Receipt' : 'طباعة الإيصال'}</button>
+              <button onClick={() => sendWhatsApp(lastReceipt)} className="flex-1 flex items-center justify-center gap-1 bg-emerald-600 text-white py-2 rounded-lg font-extrabold">WhatsApp</button>
+            </div>
+            <div className="pt-2 border-t border-emerald-200 text-[11px] space-y-1">
+              <div className="font-bold">{shopName || 'نيوم'} • طلب: {lastReceipt.number} | {lastReceipt.date}</div>
+              {lastReceipt.note && <div className="text-amber-800">ملاحظة: {lastReceipt.note}</div>}
+              {lastReceipt.lines.map((l) => (
+            function BaristaScreen({ invoices = [], currentBranch, showBranch }) {
   const [doneIds, setDoneIds] = useState([])
   const todayOrders = invoices.filter((i) => i.date === todayStr() && !doneIds.includes(i.id) && (!showBranch || !i.branch || i.branch === currentBranch))
-
   return (
     <div className="space-y-4">
-      <div className="bg-white p-4 rounded-2xl shadow-sm flex items-center justify-between border border-[#123B36]/10">
-        <h2 className="font-extrabold text-lg flex items-center gap-2"><Coffee size={22} /> شاشة تحضير الباريستا ({todayOrders.length})</h2>
-        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl">تحديث فوري</span>
+      <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm">
+        <h2 className="font-extrabold text-base flex items-center gap-2"><Coffee size={18} className="text-amber-600" /> شاشة تحضير الباريستا ({todayOrders.length})</h2>
+        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">تحديث فوري</span>
       </div>
       {todayOrders.length === 0 ? (
         <div className="bg-white p-12 rounded-2xl text-center text-sm font-bold text-[#123B36]/50">لا توجد طلبات قيد التحضير حالياً ☕</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {todayOrders.map((inv) => (
-            <div key={inv.id} className="bg-white p-4 rounded-2xl shadow-md border-2 border-[#123B36]/20 flex flex-col justify-between space-y-3">
+            <div key={inv.id} className="bg-white p-4 rounded-2xl shadow-sm border-2 border-[#123B36]/15 flex flex-col justify-between space-y-3">
               <div>
-                <div className="flex justify-between items-center border-b pb-2 mb-2">
-                  <span className="font-extrabold text-lg text-[#123B36]">طلب {inv.number}</span>
-                  <span className="text-[11px] bg-[#F4F1EA] px-2 py-0.5 rounded-lg font-bold">{inv.cashierName || 'كاشير'}</span>
+                <div className="flex items-center justify-between border-b pb-2 mb-2">
+                  <span className="font-extrabold text-base text-[#123B36]">طلب {inv.number}</span>
+                  <span className="text-[11px] bg-[#F4F1EA] px-2.5 py-0.5 rounded-full font-bold">{inv.cashierName || 'كاشير'}</span>
                 </div>
-                <div className="space-y-1.5 text-sm font-extrabold">
+                <div className="space-y-1.5">
                   {(inv.lines || []).map((l, idx) => (
-                    <div key={idx} className="bg-[#F4F1EA] px-2.5 py-1.5 rounded-xl flex justify-between">
+                    <div key={idx} className="flex justify-between items-center text-sm font-bold bg-[#F4F1EA] px-3 py-1.5 rounded-xl">
                       <span>{l.name}</span>
-                      <span className="text-amber-800">× {l.qty}</span>
+                      <span className="bg-[#123B36] text-white text-xs px-2 py-0.5 rounded-lg">× {l.qty}</span>
                     </div>
                   ))}
                 </div>
-                {inv.note && <div className="mt-2 bg-amber-100 text-amber-950 p-2 rounded-xl text-xs font-extrabold">📝 {inv.note}</div>}
+                {inv.note && <div className="mt-2 text-xs font-bold text-amber-800 bg-amber-50 p-2 rounded-xl">📝 {inv.note}</div>}
               </div>
-              <button onClick={() => setDoneIds((p) => [...p, inv.id])} className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center gap-1.5">
-                <CheckCircle2 size={16} /> تم التحضير والتسليم
+              <button onClick={() => setDoneIds((p) => [...p, inv.id])} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5">
+                <CheckCircle2 size={15} /> تم التحضير والتسليم
               </button>
             </div>
           ))}
@@ -548,63 +643,90 @@ function MaterialsScreen({ ingredients, shipments = [], currency, isManager, fea
   const unpaidTotal = shipments.filter((x) => x.pay_status === 'آجل').reduce((s, x) => s + Number(x.total || x.price || 0), 0)
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
-      <form onSubmit={handleSave} className="bg-white p-5 rounded-2xl shadow-sm space-y-4 border border-[#123B36]/10">
-        <h2 className="font-extrabold text-lg">تسجيل استلام خامات وفواتير الموردين</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div><label className="block text-xs font-bold mb-1">اسم المادة *</label><input list="ing-list" value={material} onChange={(e) => setMaterial(e.target.value)} required className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /><datalist id="ing-list">{ingredients.map((i) => <option key={i.id} value={i.name} />)}</datalist></div>
-          <div><label className="block text-xs font-bold mb-1">اسم المورد</label><input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="اختياري..." className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
+    <div className="space-y-4">
+      <form onSubmit={handleSave} className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
+        <h2 className="font-extrabold text-base">تسجيل استلام خامات وفواتير الموردين</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-bold block mb-1">اسم المادة *</label>
+            <input list="ing-list" value={material} onChange={(e) => setMaterial(e.target.value)} required className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" />
+            <datalist id="ing-list">{ingredients.map((i) => <option key={i.id} value={i.name} />)}</datalist>
+          </div>
+          <div>
+            <label className="text-xs font-bold block mb-1">اسم المورد</label>
+            <input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="اختياري..." className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" />
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div><label className="block text-xs font-bold mb-1">الكمية *</label><input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} required className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
-          <div><label className="block text-xs font-bold mb-1">الوحدة</label><select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm font-bold"><option value="كيلو">كيلو (جرام)</option><option value="جرام">جرام</option><option value="لتر">لتر (مل)</option><option value="مل">مل</option><option value="حبة">حبة</option></select></div>
-          <div><label className="block text-xs font-bold mb-1">السعر الإجمالي ({currency})</label><input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="text-xs font-bold block mb-1">الكمية *</label>
+            <input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} required className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" />
+          </div>
+          <div>
+            <label className="text-xs font-bold block mb-1">الوحدة</label>
+            <select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm font-bold">
+              <option value="كيلو">كيلو (جرام)</option>
+              <option value="جم">جرام</option>
+              <option value="لتر">لتر (مل)</option>
+              <option value="مل">مل</option>
+              <option value="حبة">حبة</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-bold block mb-1">السعر الإجمالي ({currency})</label>
+            <input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" />
+          </div>
         </div>
         {features.expiryCredit && (
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-xs font-bold mb-1">حالة الدفع للمورد</label><select value={payStatus} onChange={(e) => setPayStatus(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm font-bold outline-none"><option value="مدفوع">مدفوع (كاش/تحويل)</option><option value="آجل">آجل (ذمم للمورد)</option></select></div>
-            <div><label className="block text-xs font-bold mb-1">تاريخ انتهاء الصلاحية</label><input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold block mb-1">حالة الدفع للمورد</label>
+              <select value={payStatus} onChange={(e) => setPayStatus(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm font-bold outline-none">
+                <option value="مدفوع">مدفوع (كاش/تحويل)</option>
+                <option value="آجل">آجل (ذمم للمورد)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold block mb-1">تاريخ انتهاء الصلاحية</label>
+              <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" />
+            </div>
           </div>
         )}
-        {done && <div className="p-3 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-2"><CheckCircle2 size={16} /> تم الحفظ وتحديث المخزون!</div>}
-        <button type="submit" className="w-full py-3.5 rounded-xl bg-[#123B36] text-white font-extrabold text-sm">حفظ وتحديث المخزون</button>
+        {done && <div className="text-xs font-bold text-emerald-700 bg-emerald-50 p-2.5 rounded-xl">✓ تم الحفظ وتحديث المخزون!</div>}
+        <button type="submit" className="w-full py-3 rounded-xl bg-[#123B36] text-white font-extrabold text-sm">حفظ وتحديث المخزون</button>
       </form>
 
       {shipments.length > 0 && (
-        <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
-          <div className="flex flex-wrap justify-between items-center gap-2">
+        <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-extrabold text-sm">سجل المشتريات وذمم الموردين ({shipments.length})</h3>
             {isManager && (
-              <div className="flex gap-2 text-xs font-extrabold">
-                <span className="text-amber-800 bg-amber-50 px-3 py-1 rounded-xl">المشتريات: {fmt(totalPurchases)} {currency}</span>
-                {features.expiryCredit && unpaidTotal > 0 && <span className="text-red-700 bg-red-50 px-3 py-1 rounded-xl border border-red-200">ديون الموردين: {fmt(unpaidTotal)} {currency}</span>}
+              <div className="flex gap-3 text-xs font-extrabold">
+                <span>المشتريات: {fmt(totalPurchases)} {currency}</span>
+                {features.expiryCredit && unpaidTotal > 0 && <span className="text-red-600">ديون الموردين: {fmt(unpaidTotal)} {currency}</span>}
               </div>
             )}
           </div>
-          <div className="max-h-72 overflow-y-auto space-y-2 text-xs">
+          <div className="space-y-2 max-h-80 overflow-y-auto">
             {shipments.map((s) => (
-              <div key={s.id} className="flex flex-wrap justify-between items-center gap-2 bg-[#F4F1EA] p-3 rounded-xl">
+              <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 bg-[#F4F1EA] p-3 rounded-xl text-xs">
                 <div>
                   <div className="font-extrabold flex items-center gap-2">
                     <span>{s.material} ({s.qty} {s.unit || ''})</span>
-                    {features.expiryCredit && (s.pay_status === 'آجل' ? <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-md text-[10px]">آجل</span> : <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md text-[10px]">مدفوع</span>)}
+                    {features.expiryCredit && (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] ${s.pay_status === 'آجل' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {s.pay_status === 'آجل' ? 'آجل' : 'مدفوع'}
+                      </span>
+                    )}
                   </div>
-                  <div className="text-[11px] text-[#123B36]/60 mt-0.5">{s.date} {s.supplier ? `• ${s.supplier}` : ''} {s.expiry_date ? `• ينتهي: ${s.expiry_date}` : ''}</div>
+                  <div className="text-[11px] text-[#123B36]/60">{s.date} {s.supplier ? `• ${s.supplier}` : ''} {s.expiry_date ? `• ينتهي: ${s.expiry_date}` : ''}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-[#123B36]">{fmt(s.total || s.price)} {currency}</span>
-                  {isManager && features.expiryCredit && s.pay_status === 'آجل' && <button onClick={() => db.updateShared('shipments', s.id, { pay_status: 'مدفوع' })} className="bg-emerald-600 text-white px-2.5 py-1 rounded-lg font-bold text-[10px]">تسديد</button>}
-                  {isManager && <button onClick={() => db.deleteShared('shipments', s.id)} className="text-red-500 p-1"><Trash2 size={15} /></button>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-              function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
+                  <span className="font-extrabold">{fmt(s.total || s.price)} {currency}</span>
+                  {isManager && features.expiryCredit && s.pay_status === 'آجل' && (
+                    <button onClick={() => db.updateShared('shipments', s.id, { pay_status: 'مدفوع' })} className="bg-emerald-600 text-white px-2.5 py-1 rounded-lg font-bold text-[10px]">تسديد</button>
+                  )}
+                  function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
   const [cashInput, setCashInput] = useState('')
   const todayInvoices = (invoices || []).filter((i) => i.date === todayStr())
   const cashSales = todayInvoices.filter((i) => i.paymentMethod === 'نقدي').reduce((s, i) => s + Number(i.total || 0), 0)
@@ -614,6 +736,7 @@ function MaterialsScreen({ ingredients, shipments = [], currency, isManager, fea
     await db.insertShared('shifts', { cashier_name: user.displayName, opening_cash: Number(cashInput || 0), status: 'open', opened_at: new Date().toISOString() })
     onClose()
   }
+
   async function handleClose() {
     const expected = Number(openShift.opening_cash || 0) + cashSales
     await db.updateShared('shifts', openShift.id, { closing_cash: Number(cashInput || 0), expected_cash: expected, cash_sales: cashSales, card_sales: cardSales, status: 'closed', closed_at: new Date().toISOString() })
@@ -621,21 +744,26 @@ function MaterialsScreen({ ingredients, shipments = [], currency, isManager, fea
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4">
-        <div className="flex justify-between items-center border-b pb-3"><h3 className="font-extrabold text-base">{openShift ? 'إغلاق الوردية ومطابقة الصندوق' : 'فتح وردية جديدة'}</h3><button onClick={onClose}><X size={18} /></button></div>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl p-5 max-w-md w-full space-y-4 shadow-xl">
+        <div className="flex items-center justify-between border-b pb-3">
+          <h3 className="font-extrabold text-base">{openShift ? 'إغلاق الوردية ومطابقة الصندوق' : 'فتح وردية جديدة'}</h3>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5"><X size={18} /></button>
+        </div>
+
         {openShift ? (
           <div className="space-y-3 text-xs">
-            <div className="bg-[#F4F1EA] p-3 rounded-xl space-y-1.5">
-              <div className="flex justify-between"><span>الرصيد الافتتاحي:</span><b>{fmt(openShift.opening_cash)} {currency}</b></div>
-              <div className="flex justify-between"><span>مبيعات الكاش اليوم:</span><b>{fmt(cashSales)} {currency}</b></div>
-              <div className="flex justify-between"><span>مبيعات البطاقة/التحويل:</span><b>{fmt(cardSales)} {currency}</b></div>
-              <div className="flex justify-between border-t pt-1.5 font-extrabold"><span>إجمالي مبيعات اليوم ({todayInvoices.length} فاتورة):</span><b>{fmt(cashSales + cardSales)} {currency}</b></div>
-              <div className="flex justify-between text-sm text-emerald-600 pt-1"><span>الكاش المتوقع بالدرج:</span><b>{fmt(Number(openShift.opening_cash || 0) + cashSales)} {currency}</b></div>
+            <div className="bg-[#F4F1EA] p-3 rounded-xl space-y-1.5 font-bold">
+              <div className="flex justify-between"><span>الرصيد الافتتاحي:</span><span>{fmt(openShift.opening_cash)} {currency}</span></div>
+              <div className="flex justify-between"><span>مبيعات الكاش اليوم:</span><span>{fmt(cashSales)} {currency}</span></div>
+              <div className="flex justify-between"><span>مبيعات البطاقة/التحويل:</span><span>{fmt(cardSales)} {currency}</span></div>
+              <div className="flex justify-between"><span>إجمالي مبيعات اليوم ({todayInvoices.length} فاتورة):</span><span>{fmt(cashSales + cardSales)} {currency}</span></div>
+              <div className="flex justify-between text-sm font-extrabold text-[#123B36] border-t pt-1.5"><span>الكاش المتوقع بالدرج:</span><span>{fmt(Number(openShift.opening_cash || 0) + cashSales)} {currency}</span></div>
             </div>
+
             <div>
-              <label className="block font-bold mb-1">الكاش الفعلي المعدود في الدرج ({currency})</label>
-              <input type="number" step="0.001" value={cashInput} onChange={(e) => setCashInput(e.target.value)} placeholder="0.000" className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl font-extrabold" />
+              <label className="font-bold block mb-1">الكاش الفعلي المعدود في الدرج ({currency})</label>
+              <input type="number" step="0.001" value={cashInput} onChange={(e) => setCashInput(e.target.value)} placeholder="0.000" className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl font-extrabold outline-none" />
               {cashInput !== '' && (() => {
                 const diff = Number(cashInput) - (Number(openShift.opening_cash || 0) + cashSales)
                 return (
@@ -645,7 +773,8 @@ function MaterialsScreen({ ingredients, shipments = [], currency, isManager, fea
                 )
               })()}
             </div>
-            <div className="flex gap-2">
+
+            <div className="flex gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => {
@@ -659,19 +788,28 @@ function MaterialsScreen({ ingredients, shipments = [], currency, isManager, fea
               >
                 إرسال التقرير واتساب 📲
               </button>
-              <button onClick={handleClose} className="flex-1 py-3 rounded-xl bg-red-600 text-white font-extrabold">إغلاق الوردية وحفظ</button>
+              <button onClick={handleClose} className="flex-1 py-3 rounded-xl bg-[#123B36] text-white font-extrabold">إغلاق الوردية وحفظ</button>
             </div>
           </div>
         ) : (
           <div className="space-y-3 text-xs">
-            <div><label className="block font-bold mb-1">رصيد العهدة الافتتاحي في الدرج ({currency})</label><input type="number" step="any" value={cashInput} onChange={(e) => setCashInput(e.target.value)} placeholder="0.000" className="w-full p-3 rounded-xl bg-[#F4F1EA] outline-none font-bold" /></div>
+            <div>
+              <label className="font-bold block mb-1">رصيد العهدة الافتتاحي في الدرج ({currency})</label>
+              <input type="number" step="any" value={cashInput} onChange={(e) => setCashInput(e.target.value)} placeholder="0.000" className="w-full p-3 rounded-xl bg-[#F4F1EA] outline-none font-bold" />
+            </div>
             <button onClick={handleOpen} className="w-full py-3 rounded-xl bg-[#123B36] text-white font-extrabold">بدء الوردية الآن</button>
           </div>
         )}
+
         {shifts?.length > 0 && (
-          <div className="border-t pt-3 space-y-1.5 max-h-36 overflow-y-auto text-[11px]">
-            <div className="font-bold text-[#123B36]/60">آخر الورديات:</div>
-            {shifts.slice(0, 5).map((s) => <div key={s.id} className="flex justify-between bg-[#F4F1EA] p-2 rounded-lg"><span>{s.cashier_name} ({s.status === 'open' ? 'مفتوحة' : 'مغلقة'})</span><span>كاش: {fmt(s.closing_cash || s.opening_cash)}</span></div>)}
+          <div className="border-t pt-3 space-y-1.5 text-[11px]">
+            <div className="font-extrabold">آخر الورديات:</div>
+            {shifts.slice(0, 5).map((s) => (
+              <div key={s.id} className="flex justify-between bg-[#F4F1EA] px-2.5 py-1.5 rounded-lg">
+                <span>{s.cashier_name} ({s.status === 'open' ? 'مفتوحة' : 'مغلقة'})</span>
+                <span className="font-bold">كاش: {fmt(s.closing_cash || s.opening_cash)}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -683,26 +821,36 @@ function QrMenuModal({ shopName, onClose }) {
   const [tableNum, setTableNum] = useState('')
   const base = `${window.location.origin}/?menu=1`
   const menuUrl = tableNum ? `${base}&table=${encodeURIComponent(tableNum)}` : base
-  const qrImg = 'https://quickchart.io' + '/qr?size=260&margin=2&text=' + encodeURIComponent(menuUrl)
+  const qrImg = 'https://quickchart.io' + encodeURIComponent(menuUrl)
+
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-sm w-full p-5 text-center space-y-4">
-        <div className="flex justify-between items-center border-b pb-3"><h3 className="font-extrabold text-base">منيو الباركود والطلب المباشر</h3><button onClick={onClose}><X size={18} /></button></div>
-        <div className="text-right">
-          <label className="block text-xs font-bold mb-1">رقم الطاولة (اختياري لتخصيص الباركود):</label>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl p-5 max-w-sm w-full space-y-4 text-center shadow-xl">
+        <div className="flex items-center justify-between border-b pb-3">
+          <h3 className="font-extrabold text-base">منيو الباركود والطلب المباشر</h3>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5"><X size={18} /></button>
+        </div>
+
+        <div className="space-y-1.5 text-right">
+          <label className="text-xs font-bold block">رقم الطاولة (اختياري لتخصيص الباركود):</label>
           <input value={tableNum} onChange={(e) => setTableNum(e.target.value)} placeholder="مثلاً: 1 أو 2 أو جلسة 3" className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold outline-none" />
         </div>
-        <img src={qrImg} alt="QR Menu" className="mx-auto rounded-xl border p-2 w-52 h-52 object-contain" />
-        <p className="text-xs text-[#123B36]/70">يمسح الزبون الباركود في مقهى <b>{shopName}</b> ويطلب مباشرة فتصل الفاتورة للكاشير.</p>
+
+        <div className="flex justify-center p-3 bg-[#F4F1EA] rounded-2xl">
+          <img src={qrImg} alt="QR Menu" className="w-52 h-52 rounded-xl" />
+        </div>
+
+        <p className="text-xs text-[#123B36]/75">يمسح الزبون الباركود في مقهى <b>{shopName}</b> ويطلب مباشرة فتصل الفاتورة للكاشير.</p>
+
         <div className="flex gap-2">
           <button onClick={() => { navigator.clipboard.writeText(menuUrl); alert('تم نسخ الرابط!') }} className="flex-1 py-2.5 rounded-xl bg-[#F4F1EA] font-bold text-xs">نسخ الرابط</button>
-          <a href={menuUrl} target="_blank" rel="noreferrer" className="flex-1 py-2.5 rounded-xl bg-[#123B36] text-white font-bold text-xs">معاينة المنيو</a>
+          <a href={menuUrl} target="_blank" rel="noreferrer" className="flex-1 py-2.5 rounded-xl bg-[#123B36] text-white font-bold text-xs flex items-center justify-center">معاينة المنيو</a>
         </div>
       </div>
     </div>
   )
 }
-              function PublicQrMenu({ items, shopName, currency, showFeedback = true }) {
+               function PublicQrMenu({ items, shopName, currency, showFeedback = true }) {
   const [cart, setCart] = useState([])
   const [note, setNote] = useState('')
   const [sent, setSent] = useState(false)
@@ -754,114 +902,118 @@ function QrMenuModal({ shopName, onClose }) {
   }
 
   const shownCats = activeCat === 'الكل' ? cats.filter((c) => c !== 'الكل') : [activeCat]
-              return (
+
+  return (
     <div className="min-h-screen bg-[#F4F1EA] text-[#123B36] pb-32" dir={qrLang === 'en' ? 'ltr' : 'rtl'}>
-      <header className="bg-gradient-to-l from-[#123B36] to-[#1a524b] text-white p-5 text-center sticky top-0 z-20 shadow-md">
-        <h1 className="font-extrabold text-2xl tracking-wide">{shopName}</h1>
-        <div className="mt-2 inline-flex items-center gap-2 bg-black/25 px-3 py-1.5 rounded-full border border-white/15">
-          <span className="text-xs font-bold text-amber-300">{qrLang === 'en' ? 'Table:' : 'اختر الطاولة:'}</span>
-          <select
-            value={tableNum}
-            onChange={(e) => setTableNum(e.target.value)}
-            className="bg-amber-400 text-slate-950 font-extrabold text-xs px-2.5 py-0.5 rounded-full outline-none"
-          >
-            {Array.from({ length: 15 }, (_, i) => String(i + 1)).map((n) => (
-              <option key={n} value={n}>{qrLang === 'en' ? `Table ${n}` : `طاولة ${n}`}</option>
-            ))}
-            <option value="طلب سفري">{qrLang === 'en' ? 'Takeaway' : 'سفري (Takeaway)'}</option>
-          </select>
-          <button
-            type="button"
-            onClick={() => setQrLang((l) => (l === 'ar' ? 'en' : 'ar'))}
-            className="bg-white/20 hover:bg-white/30 text-white font-extrabold text-xs px-2.5 py-0.5 rounded-full border border-white/25"
-          >
-            {qrLang === 'ar' ? 'EN' : 'عربي'}
-          </button>
+      <header className="bg-[#123B36] text-white p-4 sticky top-0 z-20 shadow-md flex items-center justify-between">
+        <div>
+          <h1 className="font-extrabold text-lg">{shopName}</h1>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs opacity-80">{qrLang === 'en' ? 'Table:' : 'اختر الطاولة:'}</span>
+            <select
+              value={tableNum}
+              onChange={(e) => setTableNum(e.target.value)}
+              className="bg-amber-400 text-slate-950 font-extrabold text-xs px-2.5 py-0.5 rounded-full outline-none"
+            >
+              {Array.from({ length: 15 }, (_, i) => String(i + 1)).map((n) => (
+                <option key={n} value={n}>{qrLang === 'en' ? `Table ${n}` : `طاولة ${n}`}</option>
+              ))}
+              <option value="Takeaway">{qrLang === 'en' ? 'Takeaway' : 'سفري (Takeaway)'}</option>
+            </select>
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={() => setQrLang((l) => (l === 'ar' ? 'en' : 'ar'))}
+          className="bg-white/20 hover:bg-white/30 text-white font-extrabold text-xs px-2.5 py-0.5 rounded-full border border-white/25"
+        >
+          {qrLang === 'ar' ? 'EN' : 'عربي'}
+        </button>
       </header>
 
-      {!sent && (
-        <div className="sticky top-[88px] z-10 bg-[#F4F1EA]/95 backdrop-blur-xs py-2.5 px-4 border-b border-[#123B36]/10 overflow-x-auto flex gap-2">
-          {cats.map((c) => (
-            <button
-              key={c}
-              onClick={() => setActiveCat(c)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition ${activeCat === c ? 'bg-[#123B36] text-white shadow-xs' : 'bg-white text-[#123B36]/80 border border-[#123B36]/10'}`}
-            >
-              {c === 'الكل' && qrLang === 'en' ? 'All' : c}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="max-w-2xl mx-auto p-4 space-y-4">
+        {!sent && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {cats.map((c) => (
+              <button
+                key={c}
+                onClick={() => setActiveCat(c)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition ${activeCat === c ? 'bg-[#123B36] text-white shadow-xs' : 'bg-white text-[#123B36]/80 border border-[#123B36]/10'}`}
+              >
+                {c === 'الكل' && qrLang === 'en' ? 'All' : c}
+              </button>
+            ))}
+          </div>
+        )}
 
-      {sent ? (
-        <div className="max-w-md mx-auto mt-8 mx-4 p-6 bg-white rounded-3xl text-center space-y-4 shadow-lg border border-[#123B36]/10">
-          <CheckCircle2 size={48} className="mx-auto text-emerald-600" />
-          <h2 className="font-extrabold text-lg">{qrLang === 'en' ? 'Order Sent to Barista!' : 'تم إرسال طلبك للكاشير بنجاح!'}</h2>
-          <p className="text-xs text-[#123B36]/70">{qrLang === 'en' ? 'Your drinks are being prepared shortly.' : 'سيتم تحضير مشروباتك وتقديمها لطاولتك حالاً.'}</p>
-          {showFeedback && !fbSent && (
-            <form onSubmit={sendFeedback} className="bg-[#F4F1EA] p-4 rounded-2xl space-y-2.5 text-right">
-              <div className="font-extrabold text-xs text-center">{qrLang === 'en' ? 'Rate your experience ☕' : 'قيّم تجربتك معنا ☕'}</div>
-              <div className="flex justify-center gap-2 text-2xl">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button type="button" key={n} onClick={() => setRating(n)} className={`transition ${n <= rating ? 'opacity-100 scale-110' : 'opacity-30'}`}>⭐</button>
-                ))}
-              </div>
-              <input value={fbComment} onChange={(e) => setFbComment(e.target.value)} placeholder={qrLang === 'en' ? 'Write a note (optional)...' : 'اكتب ملاحظتك أو اقتراحك (اختياري)...'} className="w-full bg-white p-2.5 rounded-xl text-xs outline-none" />
-              <button type="submit" className="w-full py-2.5 rounded-xl bg-amber-500 text-[#123B36] font-extrabold text-xs">{qrLang === 'en' ? 'Send Rating' : 'إرسال التقييم'}</button>
-            </form>
-          )}
-          {fbSent && <div className="text-xs font-extrabold text-emerald-700 bg-emerald-50 py-2 rounded-xl">{qrLang === 'en' ? 'Thank you for your feedback! ❤️' : 'شكراً لتقييمك الجميل! ❤️'}</div>}
-          <button onClick={() => { setSent(false); setFbSent(false) }} className="bg-[#123B36] text-white px-6 py-2.5 rounded-xl text-xs font-bold">{qrLang === 'en' ? 'Order More' : 'طلب أصناف إضافية'}</button>
-        </div>
-      ) : (
-        <div className="max-w-2xl mx-auto p-4 space-y-6">
-          {shownCats.map((c) => (
-            <div key={c} className="space-y-2.5">
-              <h2 className="font-extrabold text-base text-[#123B36] flex items-center gap-2">
-                <span className="w-1.5 h-5 bg-amber-500 rounded-full inline-block"></span>
-                <span>{c}</span>
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {items.filter((i) => i.category === c).map((it) => {
-                  const inCart = cart.find((x) => x.id === it.id)
-                  return (
-                    <div key={it.id} className={`bg-white p-3.5 rounded-2xl shadow-sm border transition flex flex-col justify-between items-center text-center gap-3 ${inCart ? 'border-amber-400/70' : 'border-white/10'}`}>
-                      <div>
-                        <div className="font-extrabold text-sm text-[#123B36]">{qrLang === 'en' && it.name_en ? it.name_en : it.name}</div>
-                        {it.name_en && <div className="text-[11px] text-[#123B36]/55 mt-0.5">{qrLang === 'en' ? it.name : it.name_en}</div>}
-                        <div className="text-xs font-extrabold text-amber-700 mt-1">{fmt(it.price)} {currency}</div>
-                      </div>
-                      {inCart ? (
-                        <div className="flex items-center gap-2 bg-[#F4F1EA] p-1 rounded-xl border border-[#123B36]/10">
-                          <button type="button" onClick={() => dec(it.id)} className="w-8 h-8 bg-white rounded-lg font-extrabold text-red-600 shadow-xs text-base">-</button>
-                          <span className="font-extrabold text-sm w-5 text-center">{inCart.qty}</span>
-                          <button type="button" onClick={() => add(it)} className="w-8 h-8 bg-[#123B36] text-white rounded-lg font-extrabold shadow-xs text-base">+</button>
+        {sent ? (
+          <div className="bg-white p-6 rounded-2xl text-center space-y-4 shadow-sm">
+            <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto"><CheckCircle2 size={28} /></div>
+            <h2 className="font-extrabold text-lg">{qrLang === 'en' ? 'Order Sent to Barista!' : 'تم إرسال طلبك للكاشير بنجاح!'}</h2>
+            <p className="text-xs text-[#123B36]/70">{qrLang === 'en' ? 'Your drinks are being prepared shortly.' : 'سيتم تحضير مشروباتك وتقديمها لطاولتك حالاً.'}</p>
+
+            {showFeedback && !fbSent && (
+              <form onSubmit={sendFeedback} className="bg-[#F4F1EA] p-4 rounded-2xl space-y-3 text-center">
+                <div className="font-extrabold text-xs">{qrLang === 'en' ? 'Rate your experience ☕' : 'قيّم تجربتك معنا ☕'}</div>
+                <div className="flex justify-center gap-2 text-xl">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button type="button" key={n} onClick={() => setRating(n)} className={`transition ${n <= rating ? 'opacity-100 scale-110' : 'opacity-30'}`}>⭐</button>
+                  ))}
+                </div>
+                <input value={fbComment} onChange={(e) => setFbComment(e.target.value)} placeholder={qrLang === 'en' ? 'Write a note (optional)...' : 'اكتب ملاحظتك أو اقتراحك (اختياري)...'} className="w-full bg-white p-2.5 rounded-xl text-xs outline-none" />
+                <button type="submit" className="w-full py-2.5 rounded-xl bg-amber-400 text-slate-950 font-extrabold text-xs">{qrLang === 'en' ? 'Send Rating' : 'إرسال التقييم'}</button>
+              </form>
+            )}
+
+            {fbSent && <div className="text-xs font-extrabold text-emerald-700">{qrLang === 'en' ? 'Thank you for your feedback! ❤️' : 'شكراً لتقييمك الجميل! ❤️'}</div>}
+            <button onClick={() => { setSent(false); setFbSent(false) }} className="bg-[#123B36] text-white px-6 py-2.5 rounded-xl text-xs font-bold">{qrLang === 'en' ? 'Order More' : 'طلب أصناف إضافية'}</button>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {shownCats.map((c) => (
+              <div key={c} className="space-y-2.5">
+                <h3 className="font-extrabold text-sm text-[#123B36] px-1">{c}</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {items.filter((i) => i.category === c).map((it) => {
+                    const inCart = cart.find((x) => x.id === it.id)
+                    return (
+                      <div key={it.id} className={`bg-white p-3.5 rounded-2xl shadow-sm border transition flex flex-col justify-between items-center text-center gap-3 ${inCart ? 'border-amber-400/70' : 'border-white/10'}`}>
+                        <div>
+                          <div className="font-extrabold text-sm">{qrLang === 'en' && it.name_en ? it.name_en : it.name}</div>
+                          {it.name_en && <div className="text-[11px] text-[#123B36]/55">{qrLang === 'en' ? it.name : it.name_en}</div>}
+                          <div className="text-xs font-extrabold text-amber-700 mt-1">{fmt(it.price)} {currency}</div>
                         </div>
-                      ) : (
-                        <button type="button" onClick={() => add(it)} className="bg-[#123B36] hover:bg-[#1a524b] text-white px-4 py-2 rounded-xl text-xs font-extrabold shadow-xs">
-                          {qrLang === 'en' ? '+ Add' : '+ أضف'}
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
+                        {inCart ? (
+                          <div className="flex items-center gap-2 bg-[#F4F1EA] p-1 rounded-xl">
+                            <button type="button" onClick={() => dec(it.id)} className="w-8 h-8 bg-white rounded-lg font-extrabold text-red-600 shadow-xs text-base">-</button>
+                            <span className="font-extrabold text-xs w-5">{inCart.qty}</span>
+                            <button type="button" onClick={() => add(it)} className="w-8 h-8 bg-[#123B36] text-white rounded-lg font-extrabold shadow-xs text-base">+</button>
+                          </div>
+                        ) : (
+                          <button type="button" onClick={() => add(it)} className="bg-[#123B36] hover:bg-[#1a524b] text-white px-4 py-2 rounded-xl text-xs font-extrabold shadow-xs">
+                            {qrLang === 'en' ? '+ Add' : '+ أضف'}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
 
       {cart.length > 0 && !sent && (
-        <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-[#123B36]/15 p-3.5 shadow-2xl z-30 rounded-t-3xl">
-          <div className="max-w-2xl mx-auto space-y-2.5">
+        <div className="fixed bottom-0 inset-x-0 bg-white border-t p-3 shadow-lg z-30">
+          <div className="max-w-2xl mx-auto space-y-2">
             <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={qrLang === 'en' ? 'Barista notes (less sugar, extra ice...)' : 'ملاحظات للباريستا (بدون سكر، ثلج زيادة...)'} className="w-full bg-[#F4F1EA] px-3.5 py-2.5 rounded-xl text-xs outline-none font-bold" />
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[11px] text-[#123B36]/60 font-bold">{totalCount} {qrLang === 'en' ? 'items selected' : 'أصناف مختارة'}</div>
-                <div className="text-base font-extrabold text-[#123B36]">{fmt(total)} {currency}</div>
+                <div className="text-[11px] text-[#123B36]/70 font-bold">{totalCount} {qrLang === 'en' ? 'items selected' : 'أصناف مختارة'}</div>
+                <div className="font-extrabold text-base">{fmt(total)} {currency}</div>
               </div>
-              <button onClick={sendOrder} disabled={busy} className="bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-3 rounded-2xl text-sm font-extrabold shadow-md">
+              <button onClick={sendOrder} disabled={busy} className="bg-[#123B36] text-white px-6 py-3 rounded-xl font-extrabold text-xs">
                 {busy ? (qrLang === 'en' ? 'Sending...' : 'جاري الإرسال...') : (qrLang === 'en' ? 'Send Order Now' : 'إرسال الطلب الآن')}
               </button>
             </div>
@@ -870,4 +1022,4 @@ function QrMenuModal({ shopName, onClose }) {
       )}
     </div>
   )
-}
+}   
