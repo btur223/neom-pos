@@ -148,12 +148,12 @@ const settings = (settingsList && settingsList.length > 0) ? settingsList.at(0) 
       )}
 
       <main className="flex-1 p-4 max-w-7xl w-full mx-auto">
-        {activeTab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} customers={customers} tableOrders={tableOrders} user={user} currency={settings.currency || 'ر.ع'} shopName={settings.shopName || 'نيوم'} cashierName={user.displayName} currentBranch={currentBranch} showBranch={f.branches} lang={lang} />}
-        {activeTab === 'barista' && f.barista && <BaristaScreen invoices={invoices} currentBranch={currentBranch} showBranch={f.branches} />}
-        {activeTab === 'materials' && <MaterialsScreen ingredients={ingredients} shipments={shipments} currency={settings.currency || 'ر.ع'} isManager={isManager} features={f} currentBranch={currentBranch} />}
-        {activeTab === 'dashboard' && <DashboardScreen invoices={invoices} shipments={shipments} ingredients={ingredients} customers={customers} shifts={shifts} currency={settings.currency || 'ر.ع'} currentBranch={currentBranch} showBranch={f.branches} />}
-        {activeTab === 'inventory' && <InventoryScreen items={items} ingredients={ingredients} recipes={recipes} currency={settings.currency || 'ر.ع'} />}
-        {activeTab === 'settings' && <SettingsScreen settings={settings} isManager={isManager} />}
+       {activeTab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} customers={customers} tableOrders={tableOrders} user={user} currency={settings.currency || 'ر.ع'} shopName={settings.shopName || 'نيوم'} cashierName={user.displayName} currentBranch={currentBranch} showBranch={f.branches} lang={lang} />}
+        {activeTab === 'barista' && f.barista && <BaristaScreen invoices={invoices} currentBranch={currentBranch} showBranch={f.branches} lang={lang} />}
+        {activeTab === 'materials' && <MaterialsScreen ingredients={ingredients} shipments={shipments} currency={settings.currency || 'ر.ع'} isManager={isManager} features={f} currentBranch={currentBranch} lang={lang} />}
+        {activeTab === 'dashboard' && <DashboardScreen invoices={invoices} shipments={shipments} ingredients={ingredients} customers={customers} shifts={shifts} currency={settings.currency || 'ر.ع'} currentBranch={currentBranch} showBranch={f.branches} lang={lang} />}
+        {activeTab === 'inventory' && <InventoryScreen items={items} ingredients={ingredients} recipes={recipes} currency={settings.currency || 'ر.ع'} lang={lang} />}
+        {activeTab === 'settings' && <SettingsScreen settings={settings} isManager={isManager} lang={lang} />}
       </main>
 
       {showShiftModal && <ShiftModal openShift={openShift} shifts={shifts} invoices={invoices} user={user} currency={settings.currency || 'ر.ع'} onClose={() => setShowShiftModal(false)} />}
