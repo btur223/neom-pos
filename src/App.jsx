@@ -461,7 +461,7 @@ const [nowTick, setNowTick] = useState(Date.now())
             {busy ? '...' : (lang === 'en' ? 'Complete Sale' : 'إتمام البيع')}
           </button>
         </div>
-
+</div>
       {kotTicket && (
         <div id="kot-print" className="hidden print:block p-4 text-xs font-sans" dir="ltr">
           <div className="text-center border-b-2 border-dashed border-black pb-2 mb-2">
