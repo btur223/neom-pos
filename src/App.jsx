@@ -33,11 +33,11 @@ export default function App() {
   const { data: settingsList } = useLiveShared('settings')
   const { data: tableOrders } = useLiveShared('table_orders', { order: '-createdAt', limit: 50 })
 
-  const settings = (settingsList && settingsList.length > 0) ? settingsList : { id: 'main', currency: 'ر.ع', ownerPhone: '', shopName: 'نيوم' }
+const settings = (settingsList && settingsList.length > 0) ? settingsList.at(0) : { id: 'main', currency: 'ر.ع', ownerPhone: '', shopName: 'نيوم' }
   const savedLocalFeatures = (() => { try { return JSON.parse(localStorage.getItem('neom_features') || 'null') } catch { return null } })()
   const f = { branches: true, barista: true, loyalty: true, qrMenu: true, holdDiscount: true, shifts: true, expiryCredit: true, analytics: true, quickCash: true, feedback: true, coupons: true, ...(settings.features || {}), ...(savedLocalFeatures || {}) }
   const branchesList = settings.branches || ['الفرع الرئيسي - صلالة']
-  const [currentBranch, setCurrentBranch] = useState(() => localStorage.getItem('neom_branch') || branchesList)
+  const [currentBranch, setCurrentBranch] = useState(() => localStorage.getItem('neom_branch') || branchesList.at(0))
 
   const [lang, setLang] = useState(() => localStorage.getItem('neom_lang') || 'ar')
   const toggleLang = () => {
@@ -76,7 +76,7 @@ export default function App() {
     ...((isManager || up.settings) ? [{ id: 'settings', label: lang === 'en' ? 'Settings' : 'الإعدادات', icon: SlidersHorizontal }] : []),
   ]
 
-  const activeTab = baseNav.some((n) => n.id === tab) ? tab : (baseNav?.id || 'sales')
+ const activeTab = baseNav.some((n) => n.id === tab) ? tab : (baseNav.at(0)?.id || 'sales')
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F1EA] text-[#123B36]" dir={lang === 'en' ? 'ltr' : 'rtl'}>
