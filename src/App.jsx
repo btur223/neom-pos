@@ -568,7 +568,19 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOr
               <div className="font-bold">{shopName || 'نيوم'} • طلب: {lastReceipt.number} | {lastReceipt.date}</div>
               {lastReceipt.note && <div className="text-amber-800">ملاحظة: {lastReceipt.note}</div>}
               {lastReceipt.lines.map((l) => (
-            function BaristaScreen({ invoices = [], currentBranch, showBranch }) {
+                <div key={l.id} className="flex justify-between"><span>{l.name} × {l.qty}</span><span>{fmt(l.price * l.qty)}</span></div>
+              ))}
+              {lastReceipt.discount > 0 && <div className="flex justify-between text-red-600"><span>الخصم:</span><span>-{fmt(lastReceipt.discount)}</span></div>}
+              <div className="flex justify-between font-extrabold border-t pt-1"><span>الإجمالي:</span><span>{fmt(lastReceipt.total)} {currency}</span></div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function BaristaScreen({ invoices = [], currentBranch, showBranch }) {
   const [doneIds, setDoneIds] = useState([])
   const todayOrders = invoices.filter((i) => i.date === todayStr() && !doneIds.includes(i.id) && (!showBranch || !i.branch || i.branch === currentBranch))
   return (
@@ -608,7 +620,6 @@ function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOr
     </div>
   )
 }
-
 function MaterialsScreen({ ingredients, shipments = [], currency, isManager, features = {}, currentBranch = 'الفرع الرئيسي - صلالة' }) {
   const [material, setMaterial] = useState('')
   const [qty, setQty] = useState('')
