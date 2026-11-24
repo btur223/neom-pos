@@ -161,8 +161,8 @@ const settings = (settingsList && settingsList.length > 0) ? settingsList.at(0) 
     </div>
   )
 }
-function SalesScreen({ items, recipes, ingredients, invoices, customers, tableOrders = [], user, currency, shopName, cashierName, currentBranch, showBranch, lang = 'ar' }) {
-  const [cat, setCat] = useState('الكل')
+function SalesScreen({ items = [], recipes = [], ingredients = [], invoices = [], customers = [], tableOrders = [], user, currency, shopName, cashierName, currentBranch, showBranch, lang = 'ar' }) {
+const [cat, setCat] = useState('الكل')
   const [q, setQ] = useState('')
   const [cart, setCart] = useState([])
   const [payMethod, setPayMethod] = useState('نقدي')
