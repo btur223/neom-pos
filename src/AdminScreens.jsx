@@ -947,9 +947,47 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
         )}
 
         {features.feedback !== false && (
-          <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+         <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
             <h3 className="font-extrabold text-sm flex items-center gap-2"><Star size={16} className="text-amber-500" /> {lang === 'en' ? `Customer Feedback (${(feedbacks || []).length})` : `تقييمات وآراء الزبائن (${(feedbacks || []).length})`}</h3>
             {(feedbacks || []).length === 0 ? (
+              <p className="text-xs text-[#123B36]/50 py-6 text-center">{lang === 'en' ? 'Ratings from QR menu appear here.' : 'ستظهر هنا تقييمات الزبائن بعد الطلب من الباركود.'}</p>
+            ) : (
+              <div className="max-h-60 overflow-y-auto space-y-2 text-xs">
+                {(feedbacks || []).map((fb) => (
+                  <div key={fb.id} className="bg-[#F4F1EA] px-3 py-2.5 rounded-xl flex justify-between items-center">
+                    <div>
+                      <div className="font-extrabold text-amber-600">{'⭐'.repeat(fb.rating || 5)} {fb.table_num ? <span className="text-[#123B36] mr-1">({lang === 'en' ? `Table ${fb.table_num}` : `طاولة ${fb.table_num}`})</span> : ''}</div>
+                      {fb.comment && <div className="text-[#123B36]/80 mt-0.5">{fb.comment}</div>}
+                    </div>
+                    <button onClick={() => db.deleteShared('feedbacks', fb.id)} className="text-red-500 p-1"><Trash2 size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3 lg:col-span-2">
+          <h3 className="font-extrabold text-sm flex items-center gap-2"><BookOpen size={16} /> {lang === 'en' ? 'Item Cost & Profit Margin (Based on Recipes)' : 'تكلفة الأصناف وهامش الربح (حسب الرسبي)'}</h3>
+          <div className="max-h-60 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+            {itemProfitList.map((it) => (
+              <div key={it.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2 rounded-xl">
+                <div>
+                  <div className="font-bold">{it.name}</div>
+                  <div className="text-[11px] text-[#123B36]/60">{lang === 'en' ? `Sell: ${fmt(it.price)} • Cost: ${fmt(it.cost)}` : `البيع: ${fmt(it.price)} • التكلفة: ${fmt(it.cost)}`}</div>
+                </div>
+                <div className="text-left">
+                  <div className="font-extrabold text-emerald-700">+{fmt(it.profit)} {currency}</div>
+                  <div className={`text-[10px] font-bold ${it.margin < 50 ? 'text-red-600' : 'text-emerald-700'}`}>{lang === 'en' ? `Margin ${it.margin}%` : `ربح ${it.margin}%`}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
             export function InventoryScreen({ items = [], ingredients = [], recipes = [], settings, features = {}, isManager = true, currency, lang = 'ar' }) {
   const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 100 })
   const { data: transfers } = useLiveShared('stock_transfers', { order: '-created_at', limit: 50 })
