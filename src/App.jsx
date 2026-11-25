@@ -998,6 +998,20 @@ function BaristaScreen({ invoices = [], currentBranch, showBranch, lang = 'ar' }
                   <div className="text-[11px] text-[#123B36]/60">{s.date} {s.supplier ? `• ${s.supplier}` : ''} {s.expiry_date ? `• ${lang === 'en' ? 'Exp:' : 'ينتهي:'} ${s.expiry_date}` : ''}</div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <span className="font-extrabold">{fmt(s.total || s.price)} {currency}</span>
+                  {isManager && features.expiryCredit && s.pay_status === 'آجل' && (
+                    <button onClick={() => db.updateShared('shipments', s.id, { pay_status: 'مدفوع' })} className="bg-emerald-600 text-white px-2.5 py-1 rounded-lg font-bold text-[10px]">{lang === 'en' ? 'Mark Paid' : 'تسديد'}</button>
+                  )}
+                  {isManager && <button onClick={() => db.deleteShared('shipments', s.id)} className="text-red-500 p-1"><Trash2 size={14} /></button>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
                   function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
   const [cashInput, setCashInput] = useState('')
   const todayInvoices = (invoices || []).filter((i) => i.date === todayStr())
