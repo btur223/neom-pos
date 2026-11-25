@@ -1346,6 +1346,106 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
                   <div className="flex justify-between"><span>الرصيد المسجل في النظام:</span><b>{selectedAuditIng.stock} {selectedAuditIng.unit}</b></div>
                 )}
                 <div>
+                  <label className="block font-bold mb-1">الكمية الفعلية الموجودة على الرف ({selectedAuditIng.unit}):</label>
+                  <input type="number" step="any" value={actualQty} onChange={(e) => setActualQty(e.target.value)} required className="w-full bg-white px-3 py-2 rounded-lg border font-bold" />
+                </div>
+                {(isManager || !features.blindStocktake) && auditDiff !== null && (
+                  <div className={`p-2 rounded-lg font-extrabold text-center ${auditDiff < 0 ? 'bg-red-100 text-red-700' : auditDiff > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
+                    {auditDiff < 0 ? `يوجد عجز: ${auditDiff} ${selectedAuditIng.unit}` : auditDiff > 0 ? `يوجد فائض: +${auditDiff} ${selectedAuditIng.unit}` : 'الرصيد مطابق تماماً (0 فرق)'}
+                  </div>
+                )}
+              </div>
+            )}
+            {auditSentMsg && <div className="text-emerald-700 font-extrabold bg-emerald-50 p-2 rounded-lg">✓ تم إرسال نتيجة الجرد الفعلي للمالك بنجاح!</div>}
+            <button type="submit" className="w-full bg-[#123B36] text-white py-2.5 rounded-xl font-extrabold">
+              {(!isManager && features.blindStocktake) ? 'إرسال نتيجة الجرد للمالك' : 'اعتماد الجرد وتسوية الرصيد'}
+            </button>
+          </form>
+
+          <form onSubmit={handleAddWaste} className="bg-white p-4 rounded-2xl shadow-sm space-y-3 text-xs">
+            <h3 className="font-extrabold text-sm text-red-700">2. تسجيل تالف / هالك / ضيافة</h3>
+            <div>
+              <label className="block font-bold mb-1">الخامة التالفة:</label>
+              <select value={wasteIngId} onChange={(e) => setWasteIngId(e.target.value)} required className="w-full bg-[#F4F1EA] px-3 py-2.5 rounded-xl outline-none font-bold">
+                <option value="">-- اختر الخامة --</option>
+                {ingredients.map((i) => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block font-bold mb-1">الكمية التالفة:</label>
+                <input type="number" step="any" value={wasteQty} onChange={(e) => setWasteQty(e.target.value)} required className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl outline-none font-bold" />
+              </div>
+              <div>
+                <label className="block font-bold mb-1">السبب:</label>
+                <select value={wasteReason} onChange={(e) => setWasteReason(e.target.value)} className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl outline-none font-bold">
+                  <option value="تالف / انتهاء صلاحية">تالف / انتهاء صلاحية</option>
+                  <option value="انسكاب / خطأ تحضير">انسكاب / خطأ تحضير</option>
+                  <option value="ضيافة مجانية">ضيافة مجانية</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" className="w-full bg-red-600 text-white py-2.5 rounded-xl font-extrabold">خصم التالف من المخزون</button>
+          </form>
+
+          {(isManager || !features.blindStocktake) && (
+            <div className="lg:col-span-2 bg-white p-4 rounded-2xl shadow-sm space-y-2 text-xs">
+              <h3 className="font-extrabold text-sm">سجل تسويات الجرد والهالك</h3>
+              <div className="max-h-56 overflow-y-auto space-y-1.5">
+                {(wasteLogs || []).map((w) => (
+                  <div key={w.id} className="flex justify-between items-center bg-[#F4F1EA] px-3 py-2 rounded-xl">
+                    <div>
+                      <span className="font-extrabold">{w.ingredient_name}</span> • <span className="text-[#123B36]/70">{w.reason} ({w.date})</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`font-extrabold ${Number(w.qty) < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{Number(w.qty) > 0 ? `+${w.qty}` : w.qty} {w.unit}</span>
+                      {Number(w.cost_loss) > 0 && <span className="text-red-700 font-bold">(-{fmt(w.cost_loss)} {currency})</span>}
+                      <button onClick={() => db.deleteShared('waste_logs', w.id)} className="text-red-500"><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {subTab === 'transfers' && features.branchTransfers && (
+        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-4 text-xs">
+          <h3 className="font-extrabold text-sm text-[#123B36]">🔄 تحويل خامات من فرع إلى فرع</h3>
+          <form onSubmit={handleTransfer} className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+            <select value={trFrom} onChange={(e) => setTrFrom(e.target.value)} className="bg-[#F4F1EA] px-3 py-2 rounded-xl font-bold outline-none">
+              {branchesList.map((b) => <option key={b} value={b}>من: {b}</option>)}
+            </select>
+            <select value={trTo} onChange={(e) => setTrTo(e.target.value)} className="bg-[#F4F1EA] px-3 py-2 rounded-xl font-bold outline-none">
+              {branchesList.map((b) => <option key={b} value={b}>إلى: {b}</option>)}
+            </select>
+            <select value={trIngId} onChange={(e) => setTrIngId(e.target.value)} required className="bg-[#F4F1EA] px-3 py-2 rounded-xl font-bold outline-none">
+              <option value="">اختر الخامة...</option>
+              {ingredients.map((i) => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+            </select>
+            <input type="number" step="any" value={trQty} onChange={(e) => setTrQty(e.target.value)} placeholder="الكمية المحولة" required className="bg-[#F4F1EA] px-3 py-2 rounded-xl font-bold outline-none" />
+            <button type="submit" className="bg-[#123B36] text-white py-2 rounded-xl font-extrabold">تسجيل التحويل</button>
+          </form>
+
+          {(transfers || []).length > 0 && (
+            <div className="space-y-1.5 max-h-60 overflow-y-auto pt-2 border-t">
+              {(transfers || []).map((t) => (
+                <div key={t.id} className="flex justify-between items-center bg-[#F4F1EA] px-3 py-2 rounded-xl">
+                  <div>
+                    <span className="font-extrabold">{t.ingredient_name} ({t.qty} {t.unit})</span>
+                    <span className="text-[#123B36]/70 mr-2">من <b>{t.from_branch}</b> إلى <b>{t.to_branch}</b> ({t.date})</span>
+                  </div>
+                  <button onClick={() => db.deleteShared('stock_transfers', t.id)} className="text-red-500"><Trash2 size={14} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
               export function SettingsScreen({ settings, lang = 'ar' }) {
   const { data: items } = useLiveShared('items')
   const { data: ingredients } = useLiveShared('ingredients')
