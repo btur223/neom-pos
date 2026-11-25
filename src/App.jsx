@@ -761,6 +761,8 @@ const [nowTick, setNowTick] = useState(Date.now())
                     {sz}{sz === 'كبير' ? ' (+0.300)' : ''}
                   </button>
                 ))}
+                </div>
+         </div>
              <div>
               <label className="font-bold block mb-1">نوع الحليب:</label>
               <div className="grid grid-cols-3 gap-1.5">
