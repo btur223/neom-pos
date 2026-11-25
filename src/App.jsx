@@ -792,9 +792,10 @@ const [nowTick, setNowTick] = useState(Date.now())
         </div>
       )}
     </div>
-  )
+ )
 }
-              function BaristaScreen({ invoices = [], currentBranch, showBranch, lang = 'ar' }) {
+
+function BaristaScreen({ invoices = [], currentBranch, showBranch, lang = 'ar' }) {
   const [doneIds, setDoneIds] = useState([])
   const todayOrders = invoices.filter((i) => i.date === todayStr() && !doneIds.includes(i.id) && (!showBranch || !i.branch || i.branch === currentBranch))
   return (
