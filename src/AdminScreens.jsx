@@ -1179,6 +1179,173 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
             <form onSubmit={saveEditIng} className="bg-amber-50 border border-amber-300 p-2.5 rounded-xl flex flex-wrap items-center gap-2 text-xs">
               <span className="font-extrabold text-amber-900">{lang === 'en' ? 'Edit:' : 'تعديل خامة:'}</span>
               <input value={editIng.name} onChange={(e) => setEditIng({ ...editIng, name: e.target.value })} className="flex-1 min-w-[120px] bg-white px-2 py-1 rounded-lg border font-bold" />
+              <input type="number" step="any" value={editIng.stock} onChange={(e) => setEditIng({ ...editIng, stock: e.target.value })} placeholder="الرصيد" className="w-20 bg-white px-2 py-1 rounded-lg border font-bold" />
+              <select value={editIng.unit} onChange={(e) => setEditIng({ ...editIng, unit: e.target.value })} className="bg-white px-2 py-1 rounded-lg border font-bold">
+                <option value="جم">جم</option>
+                <option value="مل">مل</option>
+                <option value="حبة">حبة</option>
+              </select>
+              <input type="number" step="any" value={editIng.cost || 0} onChange={(e) => setEditIng({ ...editIng, cost: e.target.value })} placeholder="سعر الوحدة" className="w-24 bg-white px-2 py-1 rounded-lg border font-bold text-amber-800" />
+              <input type="number" step="any" value={editIng.minStock || 500} onChange={(e) => setEditIng({ ...editIng, minStock: e.target.value })} placeholder="حد التنبيه" className="w-20 bg-white px-2 py-1 rounded-lg border" />
+              <button type="submit" className="bg-emerald-700 text-white px-2.5 py-1 rounded-lg font-bold">{lang === 'en' ? 'Save' : 'حفظ'}</button>
+              <button type="button" onClick={() => setEditIng(null)} className="bg-white px-2.5 py-1 rounded-lg border">{lang === 'en' ? 'Cancel' : 'إلغاء'}</button>
+            </form>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 max-h-[520px] overflow-y-auto">
+            {ingredients.filter((i) => !search || i.name.includes(search)).map((ing) => {
+              const cost = Number(ing.cost || 0)
+              const prevCost = Number(ing.prev_cost || 0)
+              const diffPct = (cost > 0 && prevCost > 0 && Math.abs(cost - prevCost) > 0.00001) ? Math.round(((cost - prevCost) / prevCost) * 100) : 0
+              return (
+                <div key={ing.id} className="bg-[#F4F1EA] p-2 rounded-xl text-[11px] flex flex-col justify-between gap-1.5 border border-[#123B36]/10">
+                  <div>
+                    <div className="font-extrabold text-xs text-[#123B36] truncate" title={ing.name}>{ing.name}</div>
+                    <div className="text-[#123B36]/75 mt-0.5">
+                      {lang === 'en' ? 'Stock:' : 'الرصيد:'} <span className="font-extrabold text-[#123B36]">{ing.stock} {ing.unit}</span>
+                    </div>
+                    <div className="text-amber-800 font-bold mt-0.5 flex flex-wrap items-center gap-1">
+                      <span>{lang === 'en' ? 'Cost:' : 'السعر:'} {cost > 0 ? `${cost.toFixed(4)} ${currency}/${ing.unit}` : (lang === 'en' ? 'Not set' : 'غير محدد')}</span>
+                      {diffPct !== 0 && (
+                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold ${diffPct > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {diffPct > 0 ? `↑+${diffPct}%` : `↓${diffPct}%`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-1 pt-1 border-t border-[#123B36]/10">
+                    <button onClick={() => setEditIng({ ...ing })} className="bg-white text-[#123B36] px-2 py-0.5 rounded-md font-bold text-[10px] border border-[#123B36]/15">{lang === 'en' ? 'Edit' : 'تعديل'}</button>
+                    <button onClick={() => db.deleteShared('ingredients', ing.id)} className="text-red-500 p-0.5"><Trash2 size={13} /></button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+      {subTab === 'items' && (
+        <div className="bg-white p-3.5 rounded-2xl shadow-sm space-y-3">
+          <form onSubmit={addItem} className="flex flex-wrap gap-2">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={lang === 'en' ? 'Menu item name...' : 'اسم الصنف في المنيو...'} className="flex-1 min-w-[140px] bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none" />
+            <input type="number" step="0.001" value={val1} onChange={(e) => setVal1(e.target.value)} placeholder={lang === 'en' ? 'Price' : 'السعر'} className="w-20 bg-[#F4F1EA] px-2.5 py-2 rounded-xl text-xs outline-none" />
+            <input value={val2} onChange={(e) => setVal2(e.target.value)} placeholder={lang === 'en' ? 'Category' : 'الفئة (مثلاً: موهيتو)'} className="w-32 bg-[#F4F1EA] px-2.5 py-2 rounded-xl text-xs outline-none" />
+            <button className="bg-[#123B36] text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1"><Plus size={14} /> {lang === 'en' ? 'Add' : 'إضافة'}</button>
+          </form>
+
+          {editItem && (
+            <form onSubmit={saveEditItem} className="bg-amber-50 border border-amber-300 p-2.5 rounded-xl flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-extrabold text-amber-900">{lang === 'en' ? 'Edit:' : 'تعديل صنف:'}</span>
+              <input value={editItem.name} onChange={(e) => setEditItem({ ...editItem, name: e.target.value })} className="flex-1 min-w-[130px] bg-white px-2 py-1 rounded-lg border font-bold" />
+              <input type="number" step="0.001" value={editItem.price} onChange={(e) => setEditItem({ ...editItem, price: e.target.value })} className="w-20 bg-white px-2 py-1 rounded-lg border font-bold" />
+              <input value={editItem.category} onChange={(e) => setEditItem({ ...editItem, category: e.target.value })} className="w-28 bg-white px-2 py-1 rounded-lg border font-bold" />
+              <button type="submit" className="bg-emerald-700 text-white px-2.5 py-1 rounded-lg font-bold">{lang === 'en' ? 'Save' : 'حفظ'}</button>
+              <button type="button" onClick={() => setEditItem(null)} className="bg-white px-2.5 py-1 rounded-lg border">{lang === 'en' ? 'Cancel' : 'إلغاء'}</button>
+            </form>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 max-h-[520px] overflow-y-auto">
+            {items.filter((i) => !search || i.name.includes(search) || (i.category || '').includes(search)).map((it) => (
+              <div key={it.id} className={`p-2 rounded-xl text-[11px] flex flex-col justify-between gap-1 border ${it.out_of_stock ? 'bg-red-50/70 border-red-200 opacity-75' : 'bg-[#F4F1EA] border-[#123B36]/10'}`}>
+                <div>
+                  <div className="font-extrabold text-xs truncate" title={it.name}>{it.name}</div>
+                  <div className="text-[#123B36]/65 text-[10px] truncate">{it.category} • <span className="font-extrabold text-amber-800">{fmt(it.price)} {currency}</span></div>
+                </div>
+                <div className="flex items-center justify-between gap-1 pt-1 border-t border-[#123B36]/10">
+                  {features.itemAvailability ? (
+                    <button
+                      onClick={() => db.updateShared('items', it.id, { out_of_stock: !it.out_of_stock })}
+                      className={`px-1.5 py-0.5 rounded font-bold text-[9px] ${it.out_of_stock ? 'bg-red-600 text-white' : 'bg-emerald-100 text-emerald-800'}`}
+                    >
+                      {it.out_of_stock ? (lang === 'en' ? 'Out' : 'نفد ✕') : (lang === 'en' ? 'Active' : 'متوفر ✓')}
+                    </button>
+                  ) : <span />}
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setEditItem({ ...it })} className="bg-white text-[#123B36] px-2 py-0.5 rounded-md font-bold text-[10px] border border-[#123B36]/15">{lang === 'en' ? 'Edit' : 'تعديل'}</button>
+                    <button onClick={() => db.deleteShared('items', it.id)} className="text-red-500 p-0.5"><Trash2 size={13} /></button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {subTab === 'recipes' && (
+        <div className="bg-white p-3.5 rounded-2xl shadow-sm space-y-3">
+          <form onSubmit={addRecipeLine} className="flex flex-wrap gap-2">
+            <select value={selectedItem} onChange={(e) => setSelectedItem(e.target.value)} className="flex-1 min-w-[140px] bg-[#F4F1EA] px-2.5 py-2 rounded-xl text-xs outline-none">
+              <option value="">{lang === 'en' ? 'Select menu item...' : 'اختر الصنف من المنيو...'}</option>
+              {items.map((it) => <option key={it.id} value={it.name}>{it.name}</option>)}
+            </select>
+            <select value={recIng} onChange={(e) => setRecIng(e.target.value)} className="flex-1 min-w-[130px] bg-[#F4F1EA] px-2.5 py-2 rounded-xl text-xs outline-none">
+              <option value="">{lang === 'en' ? 'Select ingredient...' : 'اختر الخامة...'}</option>
+              {ingredients.map((ing) => <option key={ing.id} value={ing.name}>{ing.name} ({ing.unit})</option>)}
+            </select>
+            <input type="number" step="any" value={recQty} onChange={(e) => setRecQty(e.target.value)} placeholder={lang === 'en' ? 'Qty' : 'الكمية'} className="w-20 bg-[#F4F1EA] px-2.5 py-2 rounded-xl text-xs outline-none" />
+            <button className="bg-[#123B36] text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1"><Plus size={14} /> {lang === 'en' ? 'Add' : 'إضافة للوصفة'}</button>
+          </form>
+
+          {editRec && (
+            <form onSubmit={saveEditRecipe} className="bg-amber-50 border border-amber-300 p-2.5 rounded-xl space-y-2 text-xs">
+              <div className="font-extrabold text-amber-900">{lang === 'en' ? 'Edit Recipe:' : 'تعديل مقادير:'} {editRec.itemName}</div>
+              <div className="space-y-1">
+                {(editRec.lines || []).map((line, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="flex-1 font-bold">{line.name}</span>
+                    <input type="number" step="any" value={line.qty} onChange={(e) => { const updated = [...editRec.lines]; updated[idx] = { ...line, qty: e.target.value }; setEditRec({ ...editRec, lines: updated }) }} className="w-20 bg-white px-2 py-1 rounded-lg border font-bold" />
+                    <button type="button" onClick={() => setEditRec({ ...editRec, lines: editRec.lines.filter((_, i) => i !== idx) })} className="text-red-500 p-1"><Trash2 size={13} /></button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" className="bg-emerald-700 text-white px-2.5 py-1 rounded-lg font-bold">{lang === 'en' ? 'Save' : 'حفظ'}</button>
+                <button type="button" onClick={() => setEditRec(null)} className="bg-white px-2.5 py-1 rounded-lg border">{lang === 'en' ? 'Cancel' : 'إلغاء'}</button>
+              </div>
+            </form>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-[520px] overflow-y-auto">
+            {recipes.filter((r) => !search || r.itemName.includes(search)).map((rec) => (
+              <div key={rec.id} className="bg-[#F4F1EA] p-2 rounded-xl text-[11px] flex flex-col justify-between gap-1 border border-[#123B36]/10">
+                <div>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-extrabold text-xs text-[#123B36] truncate">{rec.itemName}</span>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button onClick={() => setEditRec(JSON.parse(JSON.stringify(rec)))} className="bg-white text-[#123B36] px-1.5 py-0.5 rounded font-bold text-[10px] border border-[#123B36]/15">{lang === 'en' ? 'Edit' : 'تعديل'}</button>
+                      <button onClick={() => db.deleteShared('recipes', rec.id)} className="text-red-500 p-0.5"><Trash2 size={13} /></button>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-[#123B36]/75 mt-1 leading-snug">{(rec.lines || []).map((l) => `${l.name} (${l.qty})`).join(' • ')}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {subTab === 'waste' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <form onSubmit={handleStocktake} className="bg-white p-4 rounded-2xl shadow-sm space-y-3 text-xs">
+            <h3 className="font-extrabold text-sm text-[#123B36]">
+              {(!isManager && features.blindStocktake) ? '1. الجرد الفعلي الأعمى (أدخل الكمية المعدودة فقط)' : '1. الجرد الفعلي وحساب العجز / الفائض'}
+            </h3>
+            <div>
+              <label className="block font-bold mb-1">اختر الخامة لجردها:</label>
+              <select value={auditIngId} onChange={(e) => { setAuditIngId(e.target.value); setActualQty('') }} className="w-full bg-[#F4F1EA] px-3 py-2.5 rounded-xl outline-none font-bold">
+                <option value="">-- اختر الخامة --</option>
+                {ingredients.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name} {(isManager || !features.blindStocktake) ? `(الدفتري: ${i.stock} ${i.unit})` : `(${i.unit})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedAuditIng && (
+              <div className="bg-[#F4F1EA] p-3 rounded-xl space-y-2">
+                {(isManager || !features.blindStocktake) && (
+                  <div className="flex justify-between"><span>الرصيد المسجل في النظام:</span><b>{selectedAuditIng.stock} {selectedAuditIng.unit}</b></div>
+                )}
+                <div>
               export function SettingsScreen({ settings, lang = 'ar' }) {
   const { data: items } = useLiveShared('items')
   const { data: ingredients } = useLiveShared('ingredients')
