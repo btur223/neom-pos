@@ -148,12 +148,12 @@ const settings = (settingsList && settingsList.length > 0) ? settingsList.at(0) 
       )}
 
       <main className="flex-1 p-4 max-w-7xl w-full mx-auto">
-       {activeTab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} customers={customers} tableOrders={tableOrders} user={user} currency={settings.currency || 'ر.ع'} shopName={settings.shopName || 'نيوم'} cashierName={user.displayName} currentBranch={currentBranch} showBranch={f.branches} lang={lang} />}
+        {activeTab === 'sales' && <SalesScreen items={items} recipes={recipes} ingredients={ingredients} invoices={invoices} customers={customers} tableOrders={tableOrders} user={user} currency={settings.currency || 'ر.ع'} shopName={settings.shopName || 'نيوم'} cashierName={user.displayName} currentBranch={currentBranch} showBranch={f.branches} features={f} settings={settings} lang={lang} />}
         {activeTab === 'barista' && f.barista && <BaristaScreen invoices={invoices} currentBranch={currentBranch} showBranch={f.branches} lang={lang} />}
         {activeTab === 'materials' && <MaterialsScreen ingredients={ingredients} shipments={shipments} currency={settings.currency || 'ر.ع'} isManager={isManager} features={f} currentBranch={currentBranch} lang={lang} />}
-        {activeTab === 'dashboard' && <DashboardScreen invoices={invoices} shipments={shipments} ingredients={ingredients} customers={customers} shifts={shifts} currency={settings.currency || 'ر.ع'} currentBranch={currentBranch} showBranch={f.branches} lang={lang} />}
-        {activeTab === 'inventory' && <InventoryScreen items={items} ingredients={ingredients} recipes={recipes} currency={settings.currency || 'ر.ع'} lang={lang} />}
-        {activeTab === 'settings' && <SettingsScreen settings={settings} isManager={isManager} lang={lang} />}
+        {activeTab === 'dashboard' && <DashboardScreen invoices={invoices} ingredients={ingredients} recipes={recipes} shifts={shifts} settings={settings} features={f} currentBranch={currentBranch} lang={lang} />}
+        {activeTab === 'inventory' && <InventoryScreen items={items} ingredients={ingredients} recipes={recipes} settings={settings} features={f} isManager={isManager} currency={settings.currency || 'ر.ع'} lang={lang} />}
+        {activeTab === 'settings' && <SettingsScreen settings={settings} lang={lang} />}
       </main>
 
       {showShiftModal && <ShiftModal openShift={openShift} shifts={shifts} invoices={invoices} user={user} currency={settings.currency || 'ر.ع'} onClose={() => setShowShiftModal(false)} />}
@@ -161,16 +161,20 @@ const settings = (settingsList && settingsList.length > 0) ? settingsList.at(0) 
     </div>
   )
 }
-function SalesScreen({ items = [], recipes = [], ingredients = [], invoices = [], customers = [], tableOrders = [], user, currency, shopName, cashierName, currentBranch, showBranch, lang = 'ar' }) {
-const [cat, setCat] = useState('الكل')
+ function SalesScreen({ items = [], recipes = [], ingredients = [], invoices = [], customers = [], tableOrders = [], user, currency, shopName, cashierName, currentBranch, showBranch, features = {}, settings = {}, lang = 'ar' }) {
+  const [cat, setCat] = useState('الكل')
   const [q, setQ] = useState('')
   const [cart, setCart] = useState([])
   const [payMethod, setPayMethod] = useState('نقدي')
+  const [splitCash, setSplitCash] = useState('')
+  const [cashTendered, setCashTendered] = useState('')
   const [lastReceipt, setLastReceipt] = useState(null)
   const [busy, setBusy] = useState(false)
   const [phone, setPhone] = useState('')
   const [redeemDiscount, setRedeemDiscount] = useState(0)
   const [manualDiscount, setManualDiscount] = useState('')
+  const [couponInput, setCouponInput] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState(null)
   const [orderNote, setOrderNote] = useState('')
   const [heldOrders, setHeldOrders] = useState([])
   const [activeTableOrder, setActiveTableOrder] = useState(null)
@@ -179,20 +183,55 @@ const [cat, setCat] = useState('الكل')
   const [lastSentCart, setLastSentCart] = useState([])
   const [kotTicket, setKotTicket] = useState(null)
 
+  const [rushActive, setRushActive] = useState(false)
+  const [modItem, setModItem] = useState(null)
+  const [modSize, setModSize] = useState('وسط')
+  const [modMilk, setModMilk] = useState('حليب عادي')
+  const [modSugar, setModSugar] = useState('سكر عادي')
+  const [modExtraShot, setModExtraShot] = useState(false)
+
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine)
+  const [offlineQueue, setOfflineQueue] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('neom_offline_invoices') || '[]') } catch { return [] }
+  })
+
+  useEffect(() => {
+    const goOnline = async () => {
+      setIsOnline(true)
+      try {
+        const queued = JSON.parse(localStorage.getItem('neom_offline_invoices') || '[]')
+        if (queued.length > 0) {
+          for (const qInv of queued) {
+            await db.insertShared('invoices', qInv)
+          }
+          localStorage.removeItem('neom_offline_invoices')
+          setOfflineQueue([])
+        }
+      } catch {}
+    }
+    const goOffline = () => setIsOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
+
   function printBaristaTicket() {
     const isFirst = lastSentCart.length === 0
     const added = []
     const cancelled = []
 
     cart.forEach((curr) => {
-      const prev = lastSentCart.find((p) => p.id === curr.id)
+      const prev = lastSentCart.find((p) => p.cartKey === curr.cartKey)
       if (!prev) added.push({ ...curr })
       else if (curr.qty > prev.qty) added.push({ ...curr, qty: curr.qty - prev.qty })
       else if (curr.qty < prev.qty) cancelled.push({ ...curr, qty: prev.qty - curr.qty })
     })
 
     lastSentCart.forEach((prev) => {
-      if (!cart.find((c) => c.id === prev.id)) cancelled.push({ ...prev })
+      if (!cart.find((c) => c.cartKey === prev.cartKey)) cancelled.push({ ...prev })
     })
 
     const sections = []
@@ -223,28 +262,67 @@ const [cat, setCat] = useState('الكل')
   }
 
   const pendingOrders = (tableOrders || []).filter((o) => o.status === 'pending')
-const cats = useMemo(() => ['الكل', ...new Set((items || []).map((i) => i.category).filter(Boolean))], [items])
-  const filtered = useMemo(() => (items || []).filter((i) => (cat === 'الكل' || i.category === cat) && (!q || i.name.includes(q) || (i.name_en && i.name_en.toLowerCase().includes(q.toLowerCase())))), [items, cat, q])
+  const visibleItems = useMemo(() => (items || []).filter((i) => !(features.itemAvailability && i.out_of_stock)), [items, features.itemAvailability])
+  const cats = useMemo(() => ['الكل', ...new Set(visibleItems.map((i) => i.category).filter(Boolean))], [visibleItems])
+  const filtered = useMemo(() => visibleItems.filter((i) => (cat === 'الكل' || i.category === cat) && (!q || i.name.includes(q) || (i.name_en && i.name_en.toLowerCase().includes(q.toLowerCase())))), [visibleItems, cat, q])
   const cleanPhone = phone.replace(/\D/g, '')
   const customer = useMemo(() => cleanPhone.length >= 8 ? (customers || []).find((c) => c.phone === cleanPhone) : null, [customers, cleanPhone])
 
   const subTotal = cart.reduce((s, l) => s + l.price * l.qty, 0)
   const extraDiscount = Number(manualDiscount || 0)
-  const totalDiscount = redeemDiscount + extraDiscount
+  const couponDiscount = appliedCoupon ? (appliedCoupon.type === 'percent' ? (subTotal * Number(appliedCoupon.value)) / 100 : Number(appliedCoupon.value)) : 0
+  const totalDiscount = redeemDiscount + extraDiscount + couponDiscount
   const total = Math.max(0, subTotal - totalDiscount)
   const commissionAmount = Number(((total * commRate) / 100).toFixed(3))
-  const nextOrderNum = `#${String((invoices || []).filter((inv) => inv.date === todayStr()).length + 1).padStart(2, '0')}`
+  const nextOrderNum = `#${String((invoices || []).filter((inv) => inv.date === todayStr()).length + offlineQueue.length + 1).padStart(2, '0')}`
 
-  function addItem(item) {
+  function pushToCart(item, modLabel = '', extraPrice = 0) {
+    const finalPrice = Number(item.price) + extraPrice
+    const finalName = modLabel ? `${item.name} (${modLabel})` : item.name
+    const cartKey = `${item.id}_${modLabel}`
     setCart((prev) => {
-      const idx = prev.findIndex((x) => x.id === item.id)
+      const idx = prev.findIndex((x) => (x.cartKey || x.id) === cartKey)
       if (idx > -1) {
         const c = [...prev]
         c[idx].qty += 1
         return c
       }
-      return [...prev, { id: item.id, name: item.name, name_en: item.name_en || '', price: Number(item.price), qty: 1 }]
+      return [...prev, { id: item.id, cartKey, baseName: item.name, name: finalName, name_en: item.name_en || '', price: finalPrice, qty: 1 }]
     })
+  }
+
+  function handleItemClick(item) {
+    const isDrink = ['القهوة الساخنة', 'القهوة الباردة', 'موهيتو', 'سموثي', 'عصائر فريش', 'ميلك شيك', 'المشروبات الساخنة'].includes(item.category)
+    if (features.modifiers && !rushActive && isDrink) {
+      setModItem(item)
+      setModSize('وسط')
+      setModMilk('حليب عادي')
+      setModSugar('سكر عادي')
+      setModExtraShot(false)
+    } else {
+      pushToCart(item)
+    }
+  }
+
+  function confirmModifierAdd() {
+    if (!modItem) return
+    const parts = []
+    let extra = 0
+    if (modSize === 'كبير') { parts.push('كبير'); extra += 0.300 }
+    if (modMilk !== 'حليب عادي') { parts.push(modMilk); extra += 0.300 }
+    if (modSugar !== 'سكر عادي') parts.push(modSugar)
+    if (modExtraShot) { parts.push('إكسترا شوت'); extra += 0.300 }
+    pushToCart(modItem, parts.join('، '), extra)
+    setModItem(null)
+  }
+
+  function applyCouponCode() {
+    const code = couponInput.trim().toUpperCase()
+    if (!code) return
+    const found = (settings?.coupons || []).find((c) => c.code === code && c.active !== false)
+    if (!found) return alert(lang === 'en' ? 'Invalid coupon code' : 'كود الخصم غير صحيح أو منتهي')
+    setAppliedCoupon(found)
+    setCouponInput('')
   }
 
   function holdCurrentOrder() {
@@ -271,14 +349,15 @@ const cats = useMemo(() => ['الكل', ...new Set((items || []).map((i) => i.ca
     if (!cart.length || busy) return
     setBusy(true)
     try {
-      const inv = await db.insertShared('invoices', {
+      const splitNote = payMethod === 'مزدوج' ? ` [دفع مزدوج: نقدي ${fmt(splitCash)} + بطاقة ${fmt(Math.max(0, total - Number(splitCash || 0)))}]` : ''
+      const invoicePayload = {
         date: todayStr(),
         number: nextOrderNum,
         total,
         discount: totalDiscount,
-        note: orderNote.trim() || null,
+        note: (orderNote.trim() + splitNote).trim() || null,
         amountPaid: total,
-        paymentMethod: payMethod,
+        paymentMethod: payMethod === 'مزدوج' ? 'نقدي' : payMethod,
         lines: cart,
         cashierId: user.id,
         cashierName: user.displayName,
@@ -287,49 +366,36 @@ const cats = useMemo(() => ['الكل', ...new Set((items || []).map((i) => i.ca
         branch: currentBranch || 'الفرع الرئيسي',
         channel,
         commission: commissionAmount,
-      })
-      for (const line of cart) {
-        const rec = recipes.find((r) => r.itemId === line.id || r.itemName === line.name)
-        if (rec && rec.lines) {
-          for (const rl of rec.lines) {
-            const ing = ingredients.find((x) => x.id === rl.ingredientId || x.name === rl.name)
-            if (ing) await db.incrementShared('ingredients', ing.id, 'stock', -(Number(rl.qty) * line.qty))
+      }
+
+      let inv = invoicePayload
+      if (!isOnline && features.offlineMode) {
+        const nextQ = [...offlineQueue, invoicePayload]
+        setOfflineQueue(nextQ)
+        localStorage.setItem('neom_offline_invoices', JSON.stringify(nextQ))
+      } else {
+        inv = await db.insertShared('invoices', invoicePayload)
+        for (const line of cart) {
+          const itemNameForRec = line.baseName || line.name
+          const rec = recipes.find((r) => r.itemId === line.id || r.itemName === itemNameForRec)
+          if (rec && rec.lines) {
+            for (const rl of rec.lines) {
+              const ing = ingredients.find((x) => x.id === rl.ingredientId || x.name === rl.name)
+              if (ing) await db.incrementShared('ingredients', ing.id, 'stock', -(Number(rl.qty) * line.qty))
+            }
           }
         }
-      }
-      const earnedPts = Math.floor(total * 10)
-      if (cleanPhone.length >= 8) {
-        if (customer) {
-          const nextPts = Math.max(0, Number(customer.points || 0) - (redeemDiscount > 0 ? 50 : 0) + earnedPts)
-          await db.updateShared('customers', customer.id, { points: nextPts, total_spent: Number(customer.total_spent || 0) + total, visits: Number(customer.visits || 0) + 1 })
-        } else {
-          await db.insertShared('customers', { phone: cleanPhone, points: earnedPts, total_spent: total, visits: 1 })
+        if (features.auditTrail && totalDiscount > 0) {
+          await db.insertShared('audit_logs', {
+            action: `خصم يدوي (${fmt(totalDiscount)} ${currency})`,
+            user_name: user.displayName,
+            details: `فاتورة ${nextOrderNum} - الإجمالي ${fmt(total)} ${currency}`,
+            created_at: new Date().toISOString(),
+          })
         }
       }
-      if (activeTableOrder) {
-        await db.updateShared('table_orders', activeTableOrder.id, { status: 'completed' })
-        setActiveTableOrder(null)
-      }
-      setLastReceipt({ ...inv, lines: cart, phone: cleanPhone, earnedPts, note: orderNote, discount: totalDiscount })
-      setCart([])
-      setLastSentCart([])
-      setRedeemDiscount(0)
-      setManualDiscount('')
-      setOrderNote('')
-      setPhone('')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  function sendWhatsApp(rec) {
-    const linesTxt = rec.lines.map((l) => `- ${l.name} × ${l.qty} = ${fmt(l.price * l.qty)} ${currency}`).join('\n')
-    const msg = `مرحباً بك في مقهى *${shopName || 'نيوم'}* ☕\nرقم الطلب: *${rec.number}*\nالتاريخ: ${rec.date}\n\n${linesTxt}\n${rec.discount > 0 ? `\nالخصم: -${fmt(rec.discount)} ${currency}` : ''}\n*الإجمالي: ${fmt(rec.total)} ${currency}*\n${rec.earnedPts ? `نقاط الولاء المكتسبة: +${rec.earnedPts} نقطة ⭐\n` : ''}شكراً لزيارتكم!`
-    const target = rec.phone ? (rec.phone.startsWith('968') ? rec.phone : `968${rec.phone}`) : ''
-    window.open('https://wa.me' + target + '?text=' + encodeURIComponent(msg), '_blank')
-  }
-
-  const [nowTick, setNowTick] = useState(Date.now())
+      
+const [nowTick, setNowTick] = useState(Date.now())
   const prevPendingRef = useRef(pendingOrders.length)
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 15000)
@@ -353,9 +419,16 @@ const cats = useMemo(() => ['الكل', ...new Set((items || []).map((i) => i.ca
     }
     prevPendingRef.current = pendingOrders.length
   }, [pendingOrders.length])
-  return (
+ return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="lg:col-span-2 space-y-3">
+      <div className="lg:col-span-2 space-y-2.5">
+        {features.offlineMode && (!isOnline || offlineQueue.length > 0) && (
+          <div className={`p-2.5 rounded-2xl text-xs font-extrabold flex items-center justify-between ${!isOnline ? 'bg-red-600 text-white' : 'bg-amber-100 text-amber-900 border border-amber-300'}`}>
+            <span>{!isOnline ? '📡 وضع العمل بدون إنترنت: يتم حفظ الفواتير محلياً وستُرفع تلقائياً عند عودة الشبكة' : `⏳ جاري مزامنة (${offlineQueue.length}) فاتورة معلقة...`}</span>
+            <span className="bg-black/20 px-2.5 py-0.5 rounded-full">{offlineQueue.length}</span>
+          </div>
+        )}
+
         {pendingOrders.length > 0 && (
           <div className="bg-amber-50 border-2 border-amber-400 p-3 rounded-2xl space-y-2">
             <div className="font-extrabold text-xs text-amber-900">🔔 طلبات جديدة من الطاولات ({pendingOrders.length})</div>
@@ -385,7 +458,7 @@ const cats = useMemo(() => ['الكل', ...new Set((items || []).map((i) => i.ca
           </div>
         )}
 
-        {heldOrders.length > 0 && (
+        {heldOrders.length > 0 && features.holdDiscount !== false && (
           <div className="bg-blue-50 border border-blue-300 p-2.5 rounded-2xl flex flex-wrap items-center gap-2 text-xs">
             <span className="font-extrabold text-blue-900 flex items-center gap-1"><PauseCircle size={15} /> طلبات معلقة:</span>
             {heldOrders.map((h) => (
@@ -398,117 +471,180 @@ const cats = useMemo(() => ['الكل', ...new Set((items || []).map((i) => i.ca
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-2xl shadow-sm">
-          <div className="relative flex-1 min-w-[180px]"><Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#123B36]/40" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={lang === 'en' ? 'Quick search...' : 'بحث سريع...'} className="w-full pr-9 pl-3 py-2 rounded-xl bg-[#F4F1EA] text-sm outline-none" /></div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1">{cats.map((c) => <button key={c} onClick={() => setCat(c)} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${cat === c ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA]'}`}>{c}</button>)}</div>
+        <div className="flex flex-wrap gap-2 items-center bg-white p-2.5 rounded-2xl shadow-sm">
+          <div className="relative flex-1 min-w-[160px]">
+            <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={lang === 'en' ? 'Quick search...' : 'بحث سريع...'} className="w-full pr-8 pl-3 py-1.5 rounded-xl bg-[#F4F1EA] text-xs outline-none" />
+          </div>
+          {features.rushMode && (
+            <button
+              type="button"
+              onClick={() => setRushActive(!rushActive)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition flex items-center gap-1 ${rushActive ? 'bg-red-600 text-white animate-pulse' : 'bg-amber-100 text-amber-900'}`}
+            >
+              ⚡ {rushActive ? (lang === 'en' ? 'Rush ON' : 'الازدحام مُفعّل') : (lang === 'en' ? 'Rush Mode' : 'وضع الازدحام')}
+            </button>
+          )}
+          <div className="flex gap-1 overflow-x-auto pb-0.5 w-full">
+            {cats.map((c) => (
+              <button key={c} onClick={() => setCat(c)} className={`px-2.5 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap ${cat === c ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA]'}`}>
+                {c}
+              </button>
+            ))}
+          </div>
         </div>
 
         {filtered.length === 0 ? <div className="bg-white p-8 rounded-2xl text-center text-sm text-[#123B36]/60">لا توجد أصناف بعد.</div> : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5">
             {filtered.map((item) => (
-              <button key={item.id} onClick={() => addItem(item)} className="bg-white p-3.5 rounded-2xl shadow-sm border border-[#123B36]/10 text-right flex flex-col justify-between hover:border-[#123B36]/40 transition">
+              <button key={item.id} onClick={() => handleItemClick(item)} className="bg-white p-2 rounded-xl shadow-xs border border-[#123B36]/10 text-right flex flex-col justify-between hover:border-[#123B36]/40 transition min-h-[66px]">
                 <div>
-                  <span className="font-bold text-sm block">{lang === 'en' && item.name_en ? item.name_en : item.name}</span>
-                  {item.name_en && <span className="text-[11px] text-[#123B36]/55 block">{lang === 'en' ? item.name : item.name_en}</span>}
+                  <span className="font-bold text-xs leading-tight block line-clamp-2">{lang === 'en' && item.name_en ? item.name_en : item.name}</span>
+                  {item.name_en && <span className="text-[10px] text-[#123B36]/55 block truncate">{lang === 'en' ? item.name : item.name_en}</span>}
                 </div>
-                <span className="text-xs font-extrabold text-[#123B36]/70 mt-2">{fmt(item.price)} {currency}</span>
+                <span className="text-[11px] font-extrabold text-amber-700 mt-1">{fmt(item.price)} {currency}</span>
               </button>
             ))}
           </div>
         )}
       </div>
+
       <div className="bg-white p-4 rounded-2xl shadow-md border border-[#123B36]/10 flex flex-col justify-between h-fit sticky top-20">
         <div>
-          <div className="flex items-center justify-between border-b pb-3 mb-3">
+          <div className="flex items-center justify-between border-b pb-2.5 mb-2.5">
             <h2 className="font-extrabold text-base">{lang === 'en' ? 'Current Order' : 'الطلب الحالي'}</h2>
             <div className="flex items-center gap-1.5">
-              {cart.length > 0 && <button onClick={holdCurrentOrder} title="تعليق الطلب" className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1"><PauseCircle size={13} /> {lang === 'en' ? 'Hold' : 'تعليق'}</button>}
+              {cart.length > 0 && features.holdDiscount !== false && <button onClick={holdCurrentOrder} title="تعليق الطلب" className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1"><PauseCircle size={13} /> {lang === 'en' ? 'Hold' : 'تعليق'}</button>}
               <span className="bg-[#123B36] text-white text-xs font-bold px-2.5 py-1 rounded-lg">{nextOrderNum}</span>
             </div>
           </div>
 
-          <div className="mb-3 bg-[#F4F1EA] p-2.5 rounded-xl space-y-1.5">
-            <div className="flex items-center gap-2"><Award size={15} className="text-amber-600" /><input value={phone} onChange={(e) => { setPhone(e.target.value); setRedeemDiscount(0) }} placeholder={lang === 'en' ? 'Customer phone (optional)' : 'جوال العميل لنقاط الولاء (اختياري)'} className="bg-transparent text-xs w-full outline-none font-bold" /></div>
-            {customer && (
-              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#123B36]/10">
-                <span className="font-bold text-emerald-700">رصيد العميل: {customer.points} نقطة</span>
-                {Number(customer.points) >= 50 && (
-                  <button onClick={() => setRedeemDiscount(redeemDiscount > 0 ? 0 : 0.5)} className={`px-2 py-0.5 rounded font-bold ${redeemDiscount > 0 ? 'bg-amber-600 text-white' : 'bg-white text-amber-700'}`}>
-                    {redeemDiscount > 0 ? 'إلغاء الخصم' : 'استبدال 50 نقطة (-0.500)'}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          {(features.loyalty !== false || features.stamps) && (
+            <div className="mb-2.5 bg-[#F4F1EA] p-2 rounded-xl space-y-1.5">
+              <div className="flex items-center gap-2"><Award size={15} className="text-amber-600" /><input value={phone} onChange={(e) => { setPhone(e.target.value); setRedeemDiscount(0) }} placeholder={lang === 'en' ? 'Customer phone (optional)' : 'جوال العميل للولاء والطوابع...'} className="bg-transparent text-xs w-full outline-none font-bold" /></div>
+              {customer && (
+                <div className="space-y-1 text-[11px] pt-1 border-t border-[#123B36]/10">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-emerald-700">النقاط: {customer.points || 0} ⭐</span>
+                    {features.stamps && <span className="font-extrabold text-amber-800">🎟️ الطوابع: {customer.stamps || 0} / 7</span>}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {Number(customer.points) >= 50 && (
+                      <button onClick={() => setRedeemDiscount(redeemDiscount > 0 ? 0 : 0.5)} className={`px-2 py-0.5 rounded font-bold ${redeemDiscount > 0 ? 'bg-amber-600 text-white' : 'bg-white text-amber-700'}`}>
+                        {redeemDiscount > 0 ? 'إلغاء الخصم' : 'استبدال 50 نقطة (-0.500)'}
+                      </button>
+                    )}
+                    {features.stamps && Number(customer.stamps || 0) >= 7 && (
+                      <button onClick={() => setRedeemDiscount(redeemDiscount > 0 ? 0 : 1.5)} className="px-2 py-0.5 rounded font-bold bg-emerald-600 text-white">
+                        🎁 صرف مشروب مجاني (-1.500)
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
-          {cart.length === 0 ? <p className="text-center text-xs text-[#123B36]/50 py-8">{lang === 'en' ? 'Tap items to add' : 'اضغط على الأصناف لإضافتها'}</p> : (
-            <div className="space-y-2 max-h-60 overflow-y-auto mb-3">
+          {cart.length === 0 ? <p className="text-center text-xs text-[#123B36]/50 py-6">{lang === 'en' ? 'Tap items to add' : 'اضغط على الأصناف لإضافتها'}</p> : (
+            <div className="space-y-1.5 max-h-52 overflow-y-auto mb-2.5">
               {cart.map((l, idx) => (
-                <div key={l.id} className="flex items-center justify-between bg-[#F4F1EA] p-2.5 rounded-xl text-xs">
+                <div key={l.cartKey || l.id} className="flex items-center justify-between bg-[#F4F1EA] p-2 rounded-xl text-xs">
                   <div>
                     <div className="font-bold">{lang === 'en' && l.name_en ? l.name_en : l.name}</div>
                     <div className="text-[#123B36]/60">{fmt(l.price)} × {l.qty}</div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: Math.max(1, x.qty - 1) } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">-</button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: Math.max(1, x.qty - 1) } : x))} className="w-6 h-6 bg-white rounded-lg font-bold">-</button>
                     <span className="font-bold w-4 text-center">{l.qty}</span>
-                    <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: x.qty + 1 } : x))} className="w-7 h-7 bg-white rounded-lg font-bold">+</button>
-                    <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="text-red-600 p-1"><Trash2 size={14} /></button>
+                    <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: x.qty + 1 } : x))} className="w-6 h-6 bg-white rounded-lg font-bold">+</button>
+                    <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="text-red-600 p-1"><Trash2 size={13} /></button>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {cart.length > 0 && (
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <div className="relative">
-                <StickyNote size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
-                <input value={orderNote} onChange={(e) => setOrderNote(e.target.value)} placeholder={lang === 'en' ? 'Note...' : 'ملاحظة (بدون سكر...)'} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none" />
+          {cart.length > 0 && !rushActive && features.holdDiscount !== false && (
+            <div className="space-y-1.5 mb-2.5">
+              <div className="grid grid-cols-2 gap-1.5">
+                <div className="relative">
+                  <StickyNote size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
+                  <input value={orderNote} onChange={(e) => setOrderNote(e.target.value)} placeholder={lang === 'en' ? 'Note...' : 'ملاحظة...'} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none" />
+                </div>
+                <div className="relative">
+                  <Percent size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
+                  <input type="number" step="0.050" min="0" value={manualDiscount} onChange={(e) => setManualDiscount(e.target.value)} placeholder={lang === 'en' ? `Discount` : `خصم (${currency})`} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none font-bold" />
+                </div>
               </div>
-              <div className="relative">
-                <Percent size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
-                <input type="number" step="0.050" min="0" value={manualDiscount} onChange={(e) => setManualDiscount(e.target.value)} placeholder={lang === 'en' ? `Discount (${currency})` : `خصم (${currency})`} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none font-bold" />
-              </div>
+              {features.coupons && (
+                <div className="flex gap-1.5">
+                  <input value={couponInput} onChange={(e) => setCouponInput(e.target.value)} placeholder={lang === 'en' ? 'Promo code...' : 'كود خصم ترويجي...'} className="flex-1 bg-[#F4F1EA] px-2.5 py-1 rounded-xl text-[11px] outline-none uppercase font-bold" />
+                  <button type="button" onClick={applyCouponCode} className="bg-[#123B36] text-white px-2.5 py-1 rounded-xl text-[11px] font-bold">{lang === 'en' ? 'Apply' : 'تطبيق'}</button>
+                  {appliedCoupon && <button type="button" onClick={() => setAppliedCoupon(null)} className="text-red-600 text-[11px] font-bold px-1">✕</button>}
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        <div className="border-t pt-3 space-y-2.5">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold opacity-75">{lang === 'en' ? 'Channel:' : 'قناة الطلب / تطبيق التوصيل:'}</span>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { name: 'محلي', rate: 0 },
-                { name: 'سفري', rate: 0 },
-                { name: 'طلبات', rate: 25 },
-                { name: 'تم', rate: 20 },
-                { name: 'توصيل خاص', rate: 0 },
-              ].map((ch) => (
-                <button
-                  key={ch.name}
-                  type="button"
-                  onClick={() => { setChannel(ch.name); setCommRate(ch.rate) }}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition ${channel === ch.name ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-[#F4F1EA] border-[#123B36]/10 opacity-75'}`}
-                >
-                  {ch.name}{ch.rate > 0 ? ` (${ch.rate}%)` : ''}
-                </button>
-              ))}
-            </div>
-            {commissionAmount > 0 && (
-              <div className="text-[10px] font-bold text-amber-700">
-                عمولة التطبيق ({commRate}%): {fmt(commissionAmount)} {currency} • الصافي: {fmt(total - commissionAmount)} {currency}
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-1.5">
-            {['نقدي', 'بطاقة', 'تحويل'].map((m) => (
-              <button key={m} onClick={() => setPayMethod(m)} className={`flex-1 py-2 rounded-xl text-xs font-extrabold border ${payMethod === m ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-[#F4F1EA] border-[#123B36]/10 opacity-75'}`}>
-                {lang === 'en' ? (m === 'نقدي' ? 'Cash' : m === 'بطاقة' ? 'Card' : 'Transfer') : m}
+        <div className="border-t pt-2.5 space-y-2">
+          <div className="flex flex-wrap gap-1">
+            {[
+              { name: 'محلي', rate: 0 },
+              { name: 'سفري', rate: 0 },
+              { name: 'طلبات', rate: 25 },
+              { name: 'تم', rate: 20 },
+              { name: 'توصيل خاص', rate: 0 },
+            ].map((ch) => (
+              <button
+                key={ch.name}
+                type="button"
+                onClick={() => { setChannel(ch.name); setCommRate(ch.rate) }}
+                className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border transition ${channel === ch.name ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-[#F4F1EA] border-[#123B36]/10 opacity-75'}`}
+              >
+                {ch.name}{ch.rate > 0 ? ` (${ch.rate}%)` : ''}
               </button>
             ))}
           </div>
+
+          <div className="flex gap-1">
+            {['نقدي', 'بطاقة', 'تحويل', ...(features.splitPay ? ['مزدوج'] : [])].map((m) => (
+              <button key={m} onClick={() => setPayMethod(m)} className={`flex-1 py-1.5 rounded-xl text-xs font-extrabold border ${payMethod === m ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-[#F4F1EA] border-[#123B36]/10 opacity-75'}`}>
+                {lang === 'en' ? (m === 'نقدي' ? 'Cash' : m === 'بطاقة' ? 'Card' : m === 'تحويل' ? 'Transfer' : 'Split') : m}
+              </button>
+            ))}
+          </div>
+
+          {payMethod === 'مزدوج' && features.splitPay && (
+            <div className="bg-amber-50 border border-amber-200 p-2 rounded-xl text-xs space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold">المدفوع نقداً:</span>
+                <input type="number" step="0.001" value={splitCash} onChange={(e) => setSplitCash(e.target.value)} placeholder="0.000" className="w-24 bg-white px-2 py-1 rounded-lg border font-extrabold text-center" />
+              </div>
+              <div className="flex justify-between font-extrabold text-emerald-800">
+                <span>المتبقي بالبطاقة:</span>
+                <span>{fmt(Math.max(0, total - Number(splitCash || 0)))} {currency}</span>
+              </div>
+            </div>
+          )}
+
+          {payMethod === 'نقدي' && features.quickCash && total > 0 && (
+            <div className="bg-[#F4F1EA] p-2 rounded-xl text-[11px] space-y-1">
+              <div className="flex items-center gap-1">
+                {[1, 5, 10, 20].map((v) => (
+                  <button key={v} type="button" onClick={() => setCashTendered(String(v))} className="flex-1 bg-white py-1 rounded-lg font-extrabold border border-[#123B36]/15">
+                    {v}
+                  </button>
+                ))}
+              </div>
+              {Number(cashTendered) >= total && (
+                <div className="flex justify-between font-extrabold text-emerald-700 pt-0.5">
+                  <span>المتبقي للزبون (الباقي):</span>
+                  <span>{fmt(Number(cashTendered) - total)} {currency}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {totalDiscount > 0 && (
             <div className="flex justify-between text-xs font-bold text-red-600">
@@ -527,11 +663,11 @@ const cats = useMemo(() => ['الكل', ...new Set((items || []).map((i) => i.ca
               type="button"
               onClick={() => printBaristaTicket()}
               disabled={!cart.length && !lastSentCart.length}
-              className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-[#123B36] font-extrabold text-xs shadow-sm disabled:opacity-40"
+              className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-[#123B36] font-extrabold text-xs shadow-sm disabled:opacity-40"
             >
               {lang === 'en' ? 'Barista KOT' : 'تذكرة باريستا'}
             </button>
-            <button onClick={checkout} disabled={!cart.length || busy} className="flex-[1.4] py-3 rounded-xl bg-[#123B36] hover:bg-[#123B36]/90 text-white font-extrabold text-sm disabled:opacity-40">
+            <button onClick={checkout} disabled={!cart.length || busy} className="flex-[1.4] py-2.5 rounded-xl bg-[#123B36] hover:bg-[#123B36]/90 text-white font-extrabold text-sm disabled:opacity-40">
               {busy ? '...' : (lang === 'en' ? 'Complete Sale' : 'إتمام البيع')}
             </button>
           </div>
@@ -557,53 +693,97 @@ const cats = useMemo(() => ['الكل', ...new Set((items || []).map((i) => i.ca
           </div>
         )}
 
-        {lastReceipt && !kotTicket && (
+        {lastReceipt && (
           <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-2">
-            <div className="font-extrabold text-emerald-800">{lang === 'en' ? `Saved #${lastReceipt.number}` : `تم حفظ الفاتورة #${lastReceipt.number}`}</div>
-            <div className="flex gap-2">
-              <button onClick={() => window.print()} className="flex-1 flex items-center justify-center gap-1 bg-[#123B36] text-white py-2 rounded-lg font-extrabold">{lang === 'en' ? 'Print Receipt' : 'طباعة الإيصال'}</button>
-              <button onClick={() => sendWhatsApp(lastReceipt)} className="flex-1 flex items-center justify-center gap-1 bg-emerald-600 text-white py-2 rounded-lg font-extrabold">WhatsApp</button>
+            <div className="flex items-center justify-between font-extrabold text-emerald-800">
+              <span>✓ تم إصدار الفاتورة {lastReceipt.number}</span>
+              <button onClick={() => setLastReceipt(null)} className="text-[#123B36]/50">✕</button>
             </div>
-            <div className="pt-2 border-t border-emerald-200 text-[11px] space-y-1">
-              <div className="font-bold">{shopName || 'نيوم'} • طلب: {lastReceipt.number} | {lastReceipt.date}</div>
-              {lastReceipt.note && <div className="text-amber-800">ملاحظة: {lastReceipt.note}</div>}
-              {lastReceipt.lines.map((l) => (
-                <div key={l.id} className="flex justify-between"><span>{l.name} × {l.qty}</span><span>{fmt(l.price * l.qty)}</span></div>
-              ))}
-              {lastReceipt.discount > 0 && <div className="flex justify-between text-red-600"><span>الخصم:</span><span>-{fmt(lastReceipt.discount)}</span></div>}
-              <div className="flex justify-between font-extrabold border-t pt-1"><span>الإجمالي:</span><span>{fmt(lastReceipt.total)} {currency}</span></div>
+            <div className="flex gap-2">
+              <button onClick={() => window.print()} className="flex-1 bg-white border py-1.5 rounded-lg font-bold">طباعة الإيصال</button>
+              <button onClick={() => sendWhatsApp(lastReceipt)} className="flex-1 bg-emerald-600 text-white py-1.5 rounded-lg font-bold">واتساب</button>
             </div>
           </div>
         )}
       </div>
+
+      {modItem && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-5 max-w-sm w-full space-y-3 shadow-xl text-xs">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h3 className="font-extrabold text-sm text-[#123B36]">{modItem.name}</h3>
+              <button onClick={() => setModItem(null)} className="text-gray-400 font-bold text-base">✕</button>
+            </div>
+            <div>
+              <label className="font-bold block mb-1">الحجم:</label>
+              <div className="flex gap-1.5">
+                {['وسط', 'كبير'].map((sz) => (
+                  <button key={sz} type="button" onClick={() => setModSize(sz)} className={`flex-1 py-2 rounded-xl font-extrabold border ${modSize === sz ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA]'}`}>
+                    {sz}{sz === 'كبير' ? ' (+0.300)' : ''}
+                  </button>
+                ))}
+             <div>
+              <label className="font-bold block mb-1">نوع الحليب:</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {['حليب عادي', 'حليب شوفان', 'حليب لوز'].map((mk) => (
+                  <button key={mk} type="button" onClick={() => setModMilk(mk)} className={`py-2 rounded-xl font-extrabold border text-[11px] ${modMilk === mk ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA]'}`}>
+                    {mk}{mk !== 'حليب عادي' ? ' (+0.3)' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="font-bold block mb-1">مستوى السكر:</label>
+              <div className="grid grid-cols-4 gap-1">
+                {['بدون سكر', 'سكر خفيف', 'سكر عادي', 'سكر زيادة'].map((sg) => (
+                  <button key={sg} type="button" onClick={() => setModSugar(sg)} className={`py-1.5 rounded-xl font-bold border text-[10px] ${modSugar === sg ? 'bg-amber-500 text-white' : 'bg-[#F4F1EA]'}`}>
+                    {sg.replace('سكر ', '')}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="flex items-center gap-2 bg-[#F4F1EA] p-2.5 rounded-xl font-extrabold cursor-pointer">
+              <input type="checkbox" checked={modExtraShot} onChange={(e) => setModExtraShot(e.target.checked)} />
+              <span>إضافة إكسترا شوت اسبريسو (+0.300 {currency})</span>
+            </label>
+            <button onClick={confirmModifierAdd} className="w-full py-3 rounded-xl bg-emerald-700 text-white font-extrabold text-sm">
+              إضافة للطلب
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function BaristaScreen({ invoices = [], currentBranch, showBranch }) {
+function BaristaScreen({ invoices = [], currentBranch, showBranch, lang = 'ar' }) {
   const [doneIds, setDoneIds] = useState([])
   const todayOrders = invoices.filter((i) => i.date === todayStr() && !doneIds.includes(i.id) && (!showBranch || !i.branch || i.branch === currentBranch))
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm">
-        <h2 className="font-extrabold text-base flex items-center gap-2"><Coffee size={18} className="text-amber-600" /> شاشة تحضير الباريستا ({todayOrders.length})</h2>
-        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">تحديث فوري</span>
+        <h2 className="font-extrabold text-base flex items-center gap-2">
+          <Coffee size={18} className="text-amber-600" /> {lang === 'en' ? `Barista Queue (${todayOrders.length})` : `شاشة تحضير الباريستا (${todayOrders.length})`}
+        </h2>
+        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">{lang === 'en' ? 'Live Sync' : 'تحديث فوري'}</span>
       </div>
       {todayOrders.length === 0 ? (
-        <div className="bg-white p-12 rounded-2xl text-center text-sm font-bold text-[#123B36]/50">لا توجد طلبات قيد التحضير حالياً ☕</div>
+        <div className="bg-white p-12 rounded-2xl text-center text-sm font-bold text-[#123B36]/50">
+          {lang === 'en' ? 'No pending orders right now ☕' : 'لا توجد طلبات قيد التحضير حالياً ☕'}
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {todayOrders.map((inv) => (
             <div key={inv.id} className="bg-white p-4 rounded-2xl shadow-sm border-2 border-[#123B36]/15 flex flex-col justify-between space-y-3">
               <div>
                 <div className="flex items-center justify-between border-b pb-2 mb-2">
-                  <span className="font-extrabold text-base text-[#123B36]">طلب {inv.number}</span>
-                  <span className="text-[11px] bg-[#F4F1EA] px-2.5 py-0.5 rounded-full font-bold">{inv.cashierName || 'كاشير'}</span>
+                  <span className="font-extrabold text-base text-[#123B36]">{lang === 'en' ? `Order ${inv.number}` : `طلب ${inv.number}`}</span>
+                  <span className="text-[11px] bg-[#F4F1EA] px-2.5 py-0.5 rounded-full font-bold">{inv.cashierName || (lang === 'en' ? 'Cashier' : 'كاشير')}</span>
                 </div>
                 <div className="space-y-1.5">
                   {(inv.lines || []).map((l, idx) => (
                     <div key={idx} className="flex justify-between items-center text-sm font-bold bg-[#F4F1EA] px-3 py-1.5 rounded-xl">
-                      <span>{l.name}</span>
+                      <span>{lang === 'en' && l.name_en ? l.name_en : l.name}</span>
                       <span className="bg-[#123B36] text-white text-xs px-2 py-0.5 rounded-lg">× {l.qty}</span>
                     </div>
                   ))}
@@ -611,7 +791,7 @@ function BaristaScreen({ invoices = [], currentBranch, showBranch }) {
                 {inv.note && <div className="mt-2 text-xs font-bold text-amber-800 bg-amber-50 p-2 rounded-xl">📝 {inv.note}</div>}
               </div>
               <button onClick={() => setDoneIds((p) => [...p, inv.id])} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5">
-                <CheckCircle2 size={15} /> تم التحضير والتسليم
+                <CheckCircle2 size={15} /> {lang === 'en' ? 'Mark Ready & Served' : 'تم التحضير والتسليم'}
               </button>
             </div>
           ))}
@@ -620,7 +800,7 @@ function BaristaScreen({ invoices = [], currentBranch, showBranch }) {
     </div>
   )
 }
-function MaterialsScreen({ ingredients, shipments = [], currency, isManager, features = {}, currentBranch = 'الفرع الرئيسي - صلالة' }) {
+          function MaterialsScreen({ ingredients, shipments = [], currency, isManager, features = {}, currentBranch = 'الفرع الرئيسي - صلالة', lang = 'ar' }) {
   const [material, setMaterial] = useState('')
   const [qty, setQty] = useState('')
   const [unit, setUnit] = useState('كيلو')
@@ -629,6 +809,7 @@ function MaterialsScreen({ ingredients, shipments = [], currency, isManager, fea
   const [payStatus, setPayStatus] = useState('مدفوع')
   const [expiryDate, setExpiryDate] = useState('')
   const [done, setDone] = useState(false)
+  const [priceAlert, setPriceAlert] = useState(null)
 
   async function handleSave(e) {
     e.preventDefault()
@@ -638,16 +819,47 @@ function MaterialsScreen({ ingredients, shipments = [], currency, isManager, fea
     const baseUnit = unit === 'كيلو' ? 'جم' : unit === 'لتر' ? 'مل' : unit
     const totalCost = Number(price || 0)
     const unitCost = baseQty > 0 ? totalCost / baseQty : 0
-    await db.insertShared('shipments', { date: todayStr(), material: material.trim(), supplier: supplier.trim(), qty: numQty, unit, price: totalCost, total: totalCost, pay_status: payStatus, expiry_date: expiryDate || null, branch: currentBranch })
+
     const existing = ingredients.find((i) => i.name.trim() === material.trim())
+    const prevCost = existing ? Number(existing.cost || 0) : 0
+    let changePct = 0
+
+    if (existing && unitCost > 0 && prevCost > 0 && Math.abs(unitCost - prevCost) > 0.00001) {
+      changePct = Math.round(((unitCost - prevCost) / prevCost) * 100)
+      setPriceAlert({ name: material.trim(), oldCost: prevCost, newCost: unitCost, pct: changePct, unit: existing.unit || baseUnit })
+    } else {
+      setPriceAlert(null)
+    }
+
+    await db.insertShared('shipments', {
+      date: todayStr(),
+      material: material.trim(),
+      supplier: supplier.trim(),
+      qty: numQty,
+      unit,
+      price: totalCost,
+      total: totalCost,
+      unit_cost: unitCost,
+      prev_cost: prevCost,
+      price_change_pct: changePct,
+      pay_status: payStatus,
+      expiry_date: expiryDate || null,
+      branch: currentBranch
+    })
+
     if (existing) {
       await db.incrementShared('ingredients', existing.id, 'stock', baseQty)
-      if (unitCost > 0) await db.updateShared('ingredients', existing.id, { cost: unitCost })
+      if (unitCost > 0) {
+        await db.updateShared('ingredients', existing.id, {
+          cost: unitCost,
+          ...(prevCost > 0 && Math.abs(unitCost - prevCost) > 0.00001 ? { prev_cost: prevCost } : {})
+        })
+      }
     } else {
-      await db.insertShared('ingredients', { name: material.trim(), unit: baseUnit, stock: baseQty, cost: unitCost, minStock: 500 })
+      await db.insertShared('ingredients', { name: material.trim(), unit: baseUnit, stock: baseQty, cost: unitCost, prev_cost: 0, minStock: 500 })
     }
     setMaterial(''); setQty(''); setPrice(''); setSupplier(''); setExpiryDate(''); setDone(true)
-    setTimeout(() => setDone(false), 3000)
+    setTimeout(() => setDone(false), 4000)
   }
 
   const totalPurchases = shipments.reduce((s, x) => s + Number(x.total || x.price || 0), 0)
@@ -656,65 +868,72 @@ function MaterialsScreen({ ingredients, shipments = [], currency, isManager, fea
   return (
     <div className="space-y-4">
       <form onSubmit={handleSave} className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
-        <h2 className="font-extrabold text-base">تسجيل استلام خامات وفواتير الموردين</h2>
+        <h2 className="font-extrabold text-base">{lang === 'en' ? 'Receive Raw Materials & Supplier Invoices' : 'تسجيل استلام خامات وفواتير الموردين'}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-bold block mb-1">اسم المادة *</label>
+            <label className="text-xs font-bold block mb-1">{lang === 'en' ? 'Material Name *' : 'اسم المادة *'}</label>
             <input list="ing-list" value={material} onChange={(e) => setMaterial(e.target.value)} required className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" />
             <datalist id="ing-list">{ingredients.map((i) => <option key={i.id} value={i.name} />)}</datalist>
           </div>
           <div>
-            <label className="text-xs font-bold block mb-1">اسم المورد</label>
-            <input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="اختياري..." className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" />
+            <label className="text-xs font-bold block mb-1">{lang === 'en' ? 'Supplier Name' : 'اسم المورد'}</label>
+            <input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder={lang === 'en' ? 'Optional...' : 'اختياري...'} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" />
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="text-xs font-bold block mb-1">الكمية *</label>
+            <label className="text-xs font-bold block mb-1">{lang === 'en' ? 'Quantity *' : 'الكمية *'}</label>
             <input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} required className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" />
           </div>
           <div>
-            <label className="text-xs font-bold block mb-1">الوحدة</label>
+            <label className="text-xs font-bold block mb-1">{lang === 'en' ? 'Unit' : 'الوحدة'}</label>
             <select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm font-bold">
-              <option value="كيلو">كيلو (جرام)</option>
-              <option value="جم">جرام</option>
-              <option value="لتر">لتر (مل)</option>
-              <option value="مل">مل</option>
-              <option value="حبة">حبة</option>
+              <option value="كيلو">{lang === 'en' ? 'Kg (Grams)' : 'كيلو (جرام)'}</option>
+              <option value="جم">{lang === 'en' ? 'Gram' : 'جرام'}</option>
+              <option value="لتر">{lang === 'en' ? 'Liter (ml)' : 'لتر (مل)'}</option>
+              <option value="مل">{lang === 'en' ? 'ml' : 'مل'}</option>
+              <option value="حبة">{lang === 'en' ? 'Piece' : 'حبة'}</option>
             </select>
           </div>
           <div>
-            <label className="text-xs font-bold block mb-1">السعر الإجمالي ({currency})</label>
+            <label className="text-xs font-bold block mb-1">{lang === 'en' ? `Total Price (${currency})` : `السعر الإجمالي (${currency})`}</label>
             <input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" />
           </div>
         </div>
         {features.expiryCredit && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold block mb-1">حالة الدفع للمورد</label>
+              <label className="text-xs font-bold block mb-1">{lang === 'en' ? 'Supplier Payment Status' : 'حالة الدفع للمورد'}</label>
               <select value={payStatus} onChange={(e) => setPayStatus(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm font-bold outline-none">
-                <option value="مدفوع">مدفوع (كاش/تحويل)</option>
-                <option value="آجل">آجل (ذمم للمورد)</option>
+                <option value="مدفوع">{lang === 'en' ? 'Paid (Cash/Transfer)' : 'مدفوع (كاش/تحويل)'}</option>
+                <option value="آجل">{lang === 'en' ? 'Credit (Unpaid)' : 'آجل (ذمم للمورد)'}</option>
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold block mb-1">تاريخ انتهاء الصلاحية</label>
+              <label className="text-xs font-bold block mb-1">{lang === 'en' ? 'Expiry Date' : 'تاريخ انتهاء الصلاحية'}</label>
               <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} className="w-full p-3 rounded-xl bg-[#F4F1EA] text-sm outline-none" />
             </div>
           </div>
         )}
-        {done && <div className="text-xs font-bold text-emerald-700 bg-emerald-50 p-2.5 rounded-xl">✓ تم الحفظ وتحديث المخزون!</div>}
-        <button type="submit" className="w-full py-3 rounded-xl bg-[#123B36] text-white font-extrabold text-sm">حفظ وتحديث المخزون</button>
+        {priceAlert && (
+          <div className={`text-xs font-extrabold p-3 rounded-xl ${priceAlert.pct > 0 ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+            {priceAlert.pct > 0
+              ? `⚠️ تنبيه ارتفاع سعر (${priceAlert.name}): ارتفع بنسبة +${priceAlert.pct}% (من ${priceAlert.oldCost.toFixed(4)} إلى ${priceAlert.newCost.toFixed(4)} ${currency}/${priceAlert.unit}) وتم تحديث هامش الربح تلقائياً!`
+              : `📉 انخفاض سعر (${priceAlert.name}): انخفض بنسبة ${priceAlert.pct}% (من ${priceAlert.oldCost.toFixed(4)} إلى ${priceAlert.newCost.toFixed(4)} ${currency}/${priceAlert.unit}) وارتفع هامش الربح!`}
+          </div>
+        )}
+        {done && <div className="text-xs font-bold text-emerald-700 bg-emerald-50 p-2.5 rounded-xl">{lang === 'en' ? '✓ Saved and inventory updated!' : '✓ تم الحفظ وتحديث المخزون والأسعار!'}</div>}
+        <button type="submit" className="w-full py-3 rounded-xl bg-[#123B36] text-white font-extrabold text-sm">{lang === 'en' ? 'Save & Update Stock' : 'حفظ وتحديث المخزون'}</button>
       </form>
 
       {shipments.length > 0 && (
         <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-extrabold text-sm">سجل المشتريات وذمم الموردين ({shipments.length})</h3>
+            <h3 className="font-extrabold text-sm">{lang === 'en' ? `Purchases & Supplier Credit (${shipments.length})` : `سجل المشتريات وذمم الموردين (${shipments.length})`}</h3>
             {isManager && (
               <div className="flex gap-3 text-xs font-extrabold">
-                <span>المشتريات: {fmt(totalPurchases)} {currency}</span>
-                {features.expiryCredit && unpaidTotal > 0 && <span className="text-red-600">ديون الموردين: {fmt(unpaidTotal)} {currency}</span>}
+                <span>{lang === 'en' ? 'Purchases:' : 'المشتريات:'} {fmt(totalPurchases)} {currency}</span>
+                {features.expiryCredit && unpaidTotal > 0 && <span className="text-red-600">{lang === 'en' ? 'Unpaid Credit:' : 'ديون الموردين:'} {fmt(unpaidTotal)} {currency}</span>}
               </div>
             )}
           </div>
@@ -722,31 +941,22 @@ function MaterialsScreen({ ingredients, shipments = [], currency, isManager, fea
             {shipments.map((s) => (
               <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 bg-[#F4F1EA] p-3 rounded-xl text-xs">
                 <div>
-                  <div className="font-extrabold flex items-center gap-2">
+                  <div className="font-extrabold flex flex-wrap items-center gap-2">
                     <span>{s.material} ({s.qty} {s.unit || ''})</span>
                     {features.expiryCredit && (
                       <span className={`px-2 py-0.5 rounded-full text-[10px] ${s.pay_status === 'آجل' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {s.pay_status === 'آجل' ? 'آجل' : 'مدفوع'}
+                        {s.pay_status === 'آجل' ? (lang === 'en' ? 'Credit' : 'آجل') : (lang === 'en' ? 'Paid' : 'مدفوع')}
+                      </span>
+                    )}
+                    {Number(s.price_change_pct) !== 0 && !isNaN(Number(s.price_change_pct)) && (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${Number(s.price_change_pct) > 0 ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
+                        {Number(s.price_change_pct) > 0 ? `↑ ارتفع +${s.price_change_pct}%` : `↓ انخفض ${s.price_change_pct}%`}
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-[#123B36]/60">{s.date} {s.supplier ? `• ${s.supplier}` : ''} {s.expiry_date ? `• ينتهي: ${s.expiry_date}` : ''}</div>
+                  <div className="text-[11px] text-[#123B36]/60">{s.date} {s.supplier ? `• ${s.supplier}` : ''} {s.expiry_date ? `• ${lang === 'en' ? 'Exp:' : 'ينتهي:'} ${s.expiry_date}` : ''}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-extrabold">{fmt(s.total || s.price)} {currency}</span>
-                  {isManager && features.expiryCredit && s.pay_status === 'آجل' && (
-                    <button onClick={() => db.updateShared('shipments', s.id, { pay_status: 'مدفوع' })} className="bg-emerald-600 text-white px-2.5 py-1 rounded-lg font-bold text-[10px]">تسديد</button>
-                  )}
-                  {isManager && <button onClick={() => db.deleteShared('shipments', s.id)} className="text-red-500 p-1"><Trash2 size={14} /></button>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
                   function ShiftModal({ openShift, shifts, invoices, user, currency, onClose }) {
   const [cashInput, setCashInput] = useState('')
   const todayInvoices = (invoices || []).filter((i) => i.date === todayStr())
