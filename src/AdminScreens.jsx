@@ -1624,3 +1624,227 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
     if (staff.length <= 1) return alert('يجب بقاء حساب واحد على الأقل في النظام!')
     const updated = staff.filter((s) => s.id !== id)
     setStaff(updated)
+saveStaffList(updated)
+  }
+
+  async function saveSettings(e) {
+    e.preventDefault()
+    if (settings?.id && settings.id !== 'main') {
+      await db.updateShared('settings', settings.id, { shopName, currency, features, coupons, branches })
+    } else {
+      await db.insertShared('settings', { shopName, currency, features, coupons, branches })
+    }
+    alert(lang === 'en' ? 'Settings saved successfully!' : 'تم حفظ الإعدادات بنجاح')
+  }
+
+  async function importFullData() {
+    if (seeding) return
+    if (!confirm('سيتم استيراد المنيو الكامل (111 صنف)، الجرد، والرسبي الكامل وتوليد الأكواد تلقائيًا. هل تريد المتابعة؟')) return
+    setSeeding(true)
+    try {
+      const existingItemNames = new Set((items || []).map((i) => i.name))
+      for (const it of SEED_ITEMS) {
+        if (!existingItemNames.has(it.name)) {
+          await db.insertShared('items', it)
+        }
+      }
+      const existingIngNames = new Set((ingredients || []).map((i) => i.name))
+      for (const ing of SEED_INGREDIENTS) {
+        if (!existingIngNames.has(ing.name)) {
+          await db.insertShared('ingredients', ing)
+        }
+      }
+      const existingRecNames = new Set((recipes || []).map((r) => r.itemName))
+      for (const rec of SEED_RECIPES) {
+        if (!existingRecNames.has(rec.itemName)) {
+          await db.insertShared('recipes', rec)
+        }
+      }
+      setSeedDone(true)
+    } finally {
+      setSeeding(false)
+    }
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-4">
+      <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
+        <h3 className="font-extrabold text-base text-[#123B36]">🎛️ {lang === 'en' ? 'System Features Control (Toggle On/Off)' : 'التحكم بمميزات النظام (تشغيل / إيقاف حسب الحاجة)'}</h3>
+        <p className="text-xs text-[#123B36]/65">{lang === 'en' ? 'Enable the features you need now and turn off the rest to keep the interface simple.' : 'فعّل المميزات التي تحتاجها حالياً وأوقف الباقي لتبسيط الواجهة، ويمكنك تشغيلها بضغطة زر في أي وقت مستقبلاً.'}</p>
+        <div className="space-y-2">
+          {featureLabels.map((item) => (
+            <div key={item.key} onClick={() => toggleFeature(item.key)} className="flex items-center justify-between gap-3 bg-[#F4F1EA] p-3.5 rounded-xl cursor-pointer hover:border-[#123B36]/30 border border-transparent transition">
+              <div>
+                <div className="font-extrabold text-xs text-[#123B36]">{item.title}</div>
+                <div className="text-[11px] text-[#123B36]/60 mt-0.5">{item.desc}</div>
+              </div>
+              <button type="button" className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition shrink-0 ${features[item.key] ? 'bg-emerald-600 text-white' : 'bg-gray-300 text-gray-700'}`}>
+                {features[item.key] ? (lang === 'en' ? 'Active ✓' : 'مُفعّل ✓') : (lang === 'en' ? 'Off' : 'مُعطّل')}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {features.branches && (
+        <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
+          <h3 className="font-extrabold text-sm flex items-center gap-2"><Store size={16} /> {lang === 'en' ? 'Branches Management' : 'إدارة الفروع (افتتاح فرع جديد أو إغلاق فرع)'}</h3>
+          <form onSubmit={handleAddBranch} className="flex gap-2">
+            <input value={newBranchName} onChange={(e) => setNewBranchName(e.target.value)} placeholder={lang === 'en' ? 'New branch name...' : 'اسم الفرع الجديد (مثلاً: فرع السعادة - صلالة)...'} required className="flex-1 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none font-bold" />
+            <button type="submit" className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">{lang === 'en' ? 'Add Branch' : 'إضافة فرع'}</button>
+          </form>
+          <div className="space-y-1.5 text-xs">
+            {branches.map((b, idx) => (
+              <div key={b} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2.5 rounded-xl">
+                <div className="font-extrabold">{idx + 1}. {b}</div>
+                {branches.length > 1 && (
+                  <button onClick={() => handleDeleteBranch(b)} className="bg-red-100 text-red-700 px-2.5 py-1 rounded-lg font-bold text-[10px]">{lang === 'en' ? 'Close' : 'إغلاق الفرع'}</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {features.coupons && (
+        <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
+          <h3 className="font-extrabold text-sm flex items-center gap-2"><Ticket size={16} /> {lang === 'en' ? 'Promo Coupons' : 'إدارة كوبونات الخصم الترويجية'}</h3>
+          <form onSubmit={handleAddCoupon} className="flex flex-wrap gap-2">
+            <input value={cCode} onChange={(e) => setCCode(e.target.value)} placeholder={lang === 'en' ? 'Code (e.g. KHAREF)' : 'الكود (مثلاً: KHAREF)'} required className="flex-1 min-w-[120px] bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none font-extrabold uppercase" />
+            <select value={cType} onChange={(e) => setCType(e.target.value)} className="bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold outline-none">
+              <option value="percent">{lang === 'en' ? 'Percent (%)' : 'نسبة مئوية (%)'}</option>
+              <option value="fixed">{lang === 'en' ? `Fixed (${currency})` : `مبلغ ثابت (${currency})`}</option>
+            </select>
+            <input type="number" step="any" value={cVal} onChange={(e) => setCVal(e.target.value)} placeholder={lang === 'en' ? 'Value' : 'القيمة'} required className="w-24 bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs outline-none font-bold" />
+            <button type="submit" className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">{lang === 'en' ? 'Add' : 'إضافة'}</button>
+          </form>
+          {coupons.length > 0 && (
+            <div className="space-y-1.5 text-xs">
+              {coupons.map((cp) => (
+                <div key={cp.id} className="flex items-center justify-between bg-[#F4F1EA] px-3 py-2 rounded-xl">
+                  <div>
+                    <span className="font-extrabold text-amber-800">{cp.code}</span>
+                    <span className="text-[11px] text-[#123B36]/70 mr-2">
+                      ({cp.type === 'percent' ? `${cp.value}%` : `${fmt(cp.value)} ${currency}`})
+                    </span>
+                  </div>
+                  <button onClick={() => handleDeleteCoupon(cp.id)} className="text-red-500 p-1"><Trash2 size={14} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
+        <h3 className="font-extrabold text-sm flex items-center gap-2"><Users size={16} /> {lang === 'en' ? 'Staff Accounts & Permissions' : 'إدارة حسابات الموظفين والصلاحيات'}</h3>
+        <form onSubmit={handleAddStaff} className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <input value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} placeholder={lang === 'en' ? 'Staff name...' : 'اسم الموظف...'} required className="bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold flex-1" />
+            <input value={newStaffPin} onChange={(e) => setNewStaffPin(e.target.value)} placeholder="PIN" required className="bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold w-28 text-center" />
+            <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="bg-[#F4F1EA] px-3 py-2 rounded-xl text-xs font-bold">
+              <option value="cashier">{lang === 'en' ? 'Custom Perms' : 'صلاحيات مخصصة'}</option>
+              <option value="manager">{lang === 'en' ? 'Manager (All)' : 'مدير (كامل الصلاحيات)'}</option>
+            </select>
+            <button type="submit" className="bg-[#123B36] text-white px-4 py-2 rounded-xl text-xs font-bold">{lang === 'en' ? 'Add' : 'إضافة'}</button>
+          </div>
+          {newStaffRole !== 'manager' && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {PERM_OPTIONS.map((p) => (
+                <label key={p.key} className="flex items-center gap-1.5 bg-[#F4F1EA] px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!newStaffPerms[p.key]}
+                    onChange={(e) => setNewStaffPerms({ ...newStaffPerms, [p.key]: e.target.checked })}
+                  />
+                  <span>{p.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </form>
+        <div className="space-y-2 text-xs">
+          {staff.map((st) => {
+            const stPerms = st.perms || (st.role === 'manager'
+              ? { pos: true, receiving: true, inventory: true, dashboard: true, discount: true, settings: true }
+              : { pos: true, receiving: true, inventory: false, dashboard: false, discount: false, settings: false })
+            return (
+              <div key={st.id} className="bg-[#F4F1EA] p-3 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-extrabold">{st.displayName}</span>
+                    <span className="text-[11px] opacity-70 mr-2">(PIN: {st.pin})</span>
+                  </div>
+                  <button onClick={() => handleDeleteStaff(st.id)} className="text-red-500 p-1"><Trash2 size={14} /></button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {PERM_OPTIONS.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => toggleStaffPerm(st.id, p.key)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                        stPerms[p.key]
+                          ? 'bg-emerald-600/20 text-emerald-800 border-emerald-500/40'
+                          : 'bg-white opacity-60 border-[#123B36]/15'
+                      }`}
+                    >
+                      {stPerms[p.key] ? '✓ ' : '+ '}{p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-l from-[#123B36] to-[#1e574f] text-white p-5 rounded-2xl shadow-md space-y-3">
+        <div className="flex items-center gap-2 font-extrabold text-base">
+          <Sparkles size={20} className="text-amber-300" />
+          <span>{lang === 'en' ? 'Seed Full Menu, Inventory & Recipes' : 'تعبئة المنيو والجرد والرسبي الكامل'}</span>
+        </div>
+        <p className="text-xs text-white/80 leading-relaxed">
+          {lang === 'en' ? 'Click below to import all 111 menu items, ingredients, and recipes in one click.' : 'اضغط على الزر بالأسفل لإدخال كافة أصناف المنيو (111 صنفًا) والمواد الخام النظيفة ومقادير الرسبي دفعة واحدة.'}
+        </p>
+        <button
+          onClick={importFullData}
+          disabled={seeding}
+          className="w-full bg-amber-400 hover:bg-amber-300 text-[#123B36] font-extrabold py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition"
+        >
+          <Database size={18} />
+          {seeding ? '...' : seedDone ? (lang === 'en' ? 'Imported Successfully!' : 'تم الاستيراد بنجاح!') : (lang === 'en' ? 'Import Full Data Now' : 'استيراد المنيو والجرد والرسبي الآن')}
+        </button>
+      </div>
+
+      <form onSubmit={saveSettings} className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
+        <h3 className="font-extrabold text-sm">{lang === 'en' ? 'Store Settings' : 'إعدادات المتجر'}</h3>
+        <div>
+          <label className="text-xs font-bold block mb-1">{lang === 'en' ? 'Shop Name' : 'اسم المشروع'}</label>
+          <input value={shopName} onChange={(e) => setShopName(e.target.value)} className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl text-sm outline-none" />
+        </div>
+        <div>
+          <label className="text-xs font-bold block mb-1">{lang === 'en' ? 'Currency' : 'العملة'}</label>
+          <input value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl text-sm outline-none" />
+        </div>
+        <button className="bg-[#123B36] text-white px-5 py-2.5 rounded-xl text-xs font-bold">{lang === 'en' ? 'Save Settings' : 'حفظ الإعدادات'}</button>
+      </form>
+
+      <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
+        <h3 className="font-extrabold text-base text-[#123B36]">📲 {lang === 'en' ? 'Install Mobile App (Android & iOS)' : 'تحميل وتثبيت تطبيق الجوال (أندرويد وآيفون)'}</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <a href="/neom.apk" download="Neom-POS.apk" className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white py-3 px-4 rounded-xl text-xs font-extrabold shadow-xs transition">
+            <span>🤖 {lang === 'en' ? 'Download Android (APK)' : 'تحميل تطبيق الأندرويد (APK)'}</span>
+          </a>
+          <button
+            type="button"
+            onClick={() => alert('لتثبيت التطبيق على الآيفون (iOS):\n1. افتح رابط النظام في متصفح Safari\n2. اضغط على أيقونة المشاركة (⬆️) في الأسفل\n3. اختر "إضافة إلى الشاشة الرئيسية" (Add to Home Screen)')}
+            className="flex items-center justify-center gap-2 bg-[#123B36] hover:bg-[#1a524b] text-white py-3 px-4 rounded-xl text-xs font-extrabold shadow-xs transition"
+          >
+            <span>🍎 {lang === 'en' ? 'Install on iPhone (iOS)' : 'طريقة التثبيت على الآيفون (iOS)'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
