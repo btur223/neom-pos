@@ -394,7 +394,47 @@ const settings = (settingsList && settingsList.length > 0) ? settingsList.at(0) 
           })
         }
       }
-      
+   const earnedPts = Math.floor(total * 10)
+      const cupsCount = cart.reduce((s, l) => s + Number(l.qty || 1), 0)
+      if (cleanPhone.length >= 8 && isOnline) {
+        if (customer) {
+          const nextPts = Math.max(0, Number(customer.points || 0) - (redeemDiscount > 0 ? 50 : 0) + earnedPts)
+          const nextStamps = ((Number(customer.stamps || 0) + cupsCount) % 8)
+          await db.updateShared('customers', customer.id, {
+            points: nextPts,
+            stamps: nextStamps,
+            total_spent: Number(customer.total_spent || 0) + total,
+            visits: Number(customer.visits || 0) + 1
+          })
+        } else {
+          await db.insertShared('customers', { phone: cleanPhone, points: earnedPts, stamps: cupsCount % 8, total_spent: total, visits: 1 })
+        }
+      }
+      if (activeTableOrder && isOnline) {
+        await db.updateShared('table_orders', activeTableOrder.id, { status: 'completed' })
+        setActiveTableOrder(null)
+      }
+      setLastReceipt({ ...inv, lines: cart, phone: cleanPhone, earnedPts, note: orderNote, discount: totalDiscount })
+      setCart([])
+      setLastSentCart([])
+      setRedeemDiscount(0)
+      setManualDiscount('')
+      setAppliedCoupon(null)
+      setOrderNote('')
+      setPhone('')
+      setSplitCash('')
+      setCashTendered('')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function sendWhatsApp(rec) {
+    const linesTxt = rec.lines.map((l) => `- ${l.name} × ${l.qty} = ${fmt(l.price * l.qty)} ${currency}`).join('\n')
+    const msg = `مرحباً بك في مقهى *${shopName || 'نيوم'}* ☕\nرقم الطلب: *${rec.number}*\nالتاريخ: ${rec.date}\n\n${linesTxt}\n${rec.discount > 0 ? `\nالخصم: -${fmt(rec.discount)} ${currency}` : ''}\n*الإجمالي: ${fmt(rec.total)} ${currency}*\n${rec.earnedPts ? `نقاط الولاء المكتسبة: +${rec.earnedPts} نقطة ⭐\n` : ''}شكراً لزيارتكم!`
+    const target = rec.phone ? (rec.phone.startsWith('968') ? rec.phone : `968${rec.phone}`) : ''
+    window.open('https://wa.me' + target + '?text=' + encodeURIComponent(msg), '_blank')
+  }   
 const [nowTick, setNowTick] = useState(Date.now())
   const prevPendingRef = useRef(pendingOrders.length)
   useEffect(() => {
