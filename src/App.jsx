@@ -627,11 +627,10 @@ const [nowTick, setNowTick] = useState(Date.now())
               </div>
             </div>
           )}
-
-          {payMethod === 'نقدي' && features.quickCash && total > 0 && (
+{payMethod === 'نقدي' && features.quickCash && total > 0 && (
             <div className="bg-[#F4F1EA] p-2 rounded-xl text-[11px] space-y-1">
               <div className="flex items-center gap-1">
-                {[1, 5, 10, 20].map((v) => (
+                {Array.of(1, 5, 10, 20).map((v) => (
                   <button key={v} type="button" onClick={() => setCashTendered(String(v))} className="flex-1 bg-white py-1 rounded-lg font-extrabold border border-[#123B36]/15">
                     {v}
                   </button>
