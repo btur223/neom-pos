@@ -1111,7 +1111,7 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
 const [ocrScanning, setOcrScanning] = useState(false)
 
   async function handleOcrInventory(e, targetMode) {
-    const file = e.target.files?.
+    const file = e.target.files && e.target.files.item(0)
     if (!file) return
     setOcrScanning(true)
     try {
