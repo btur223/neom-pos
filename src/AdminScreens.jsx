@@ -1887,18 +1887,38 @@ saveStaffList(updated)
         <h3 className="font-extrabold text-base text-[#123B36]">🎛️ {lang === 'en' ? 'System Features Control (Toggle On/Off)' : 'التحكم بميزات النظام (تشغيل / إيقاف)'}</h3>
         <p className="text-xs text-[#123B36]/65">{lang === 'en' ? 'Enable the features you need now and turn off the rest to keep the interface simple.' : 'فعّل الميزات التي تحتاجها الآن وأوقف البقية لتبقى الواجهة بسيطة وسريعة.'}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-          {featureLabels.map((item) => (
-            <div key={item.key} onClick={() => toggleFeature(item.key)} className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between gap-2.5 ${features[item.key] ? 'bg-emerald-50/70 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-700' : 'bg-[#F4F1EA] border-[#123B36]/10 opacity-80'}`}>
+         {featureLabels.map((item) => (
+            <div
+              key={item.key}
+              onClick={() => toggleFeature(item.key)}
+              className={`p-3.5 rounded-xl border-2 cursor-pointer transition flex flex-col justify-between gap-2.5 ${
+                features[item.key]
+                  ? 'bg-emerald-50 dark:bg-slate-800 border-emerald-500 dark:border-emerald-500/80 shadow-sm'
+                  : 'bg-[#F4F1EA] dark:bg-slate-900 border-[#123B36]/15 dark:border-slate-700'
+              }`}
+            >
               <div>
-                <div className="font-extrabold text-xs text-[#123B36]">{lang === 'en' ? item.title : item.title.replace(/\s*\([A-Za-z\s&/+-]+\)\s*/g, '')}</div>
-                <div className="text-[11px] text-[#123B36]/70 mt-1 leading-relaxed">{item.desc}</div>
+                <div className="font-extrabold text-xs text-[#123B36] dark:text-white">
+                  {lang === 'en' ? item.title : item.title.replace(/\s*\([A-Za-z\s&/+-]+\)\s*/g, '')}
+                </div>
+                <div className="text-[11px] text-[#123B36]/80 dark:text-slate-300 mt-1 leading-relaxed">
+                  {item.desc}
+                </div>
               </div>
-              <div className="flex justify-end pt-1 border-t border-[#123B36]/10">
-                <button type="button" className={`px-3 py-1 rounded-lg text-[11px] font-extrabold transition ${features[item.key] ? 'bg-emerald-700 text-white' : 'bg-white text-[#123B36]/70 border'}`}>
+              <div className="flex justify-end pt-1.5 border-t border-[#123B36]/10 dark:border-slate-700">
+                <button
+                  type="button"
+                  className={`px-3 py-1 rounded-lg text-[11px] font-extrabold transition ${
+                    features[item.key]
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-[#123B36] dark:text-slate-300 border border-gray-300 dark:border-slate-600'
+                  }`}
+                >
                   {features[item.key] ? (lang === 'en' ? 'Active ✓' : 'مفعّل ✓') : (lang === 'en' ? 'Off' : 'معطّل')}
                 </button>
               </div>
             </div>
+          ))}
           ))}
         </div>
       </div>
