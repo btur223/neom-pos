@@ -51,3 +51,55 @@ input, select {
 .text-\[\#123B36\]\/60 {
   color: #CBD5E1 !important;
 }
+/* ثيم الكافيه الدافئ المريح للعين - Roasted Espresso & Warm Cream */
+.dark body,
+[data-theme="dark"] body {
+  background-color: #18120e !important;
+  color: #f5efea !important;
+}
+
+.dark .bg-white,
+[data-theme="dark"] .bg-white {
+  background-color: #241b15 !important;
+  color: #f5efea !important;
+  border-color: #3a2c23 !important;
+}
+
+.dark .bg-\[\#F4F1EA\],
+.dark .bg-emerald-50,
+.dark .bg-emerald-50\/70,
+.dark .bg-amber-50,
+.dark .bg-slate-800,
+.dark .bg-slate-900,
+[data-theme="dark"] .bg-\[\#F4F1EA\],
+[data-theme="dark"] .bg-emerald-50,
+[data-theme="dark"] .bg-emerald-50\/70,
+[data-theme="dark"] .bg-amber-50,
+[data-theme="dark"] .bg-slate-800,
+[data-theme="dark"] .bg-slate-900 {
+  background-color: #2d221b !important;
+  color: #f5efea !important;
+  border-color: #46352a !important;
+}
+
+.dark .text-\[\#123B36\],
+.dark .text-\[\#123B36\]\/80,
+.dark .text-\[\#123B36\]\/70,
+.dark .text-\[\#123B36\]\/65,
+[data-theme="dark"] .text-\[\#123B36\],
+[data-theme="dark"] .text-\[\#123B36\]\/80,
+[data-theme="dark"] .text-\[\#123B36\]\/70,
+[data-theme="dark"] .text-\[\#123B36\]\/65 {
+  color: #efe6dd !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea,
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: #1c1511 !important;
+  color: #f5efea !important;
+  border-color: #46352a !important;
+}
