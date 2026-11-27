@@ -674,7 +674,26 @@ const { data: auditLogs } = useLiveShared('audit_logs', { order: '-created_at', 
           <MessageCircle size={15} /> {lang === 'en' ? 'Send Owner WhatsApp' : 'إرسال تقرير المالك واتساب'}
         </button>
       </div>
-{expiringItems.length > 0 && (
+{(() => {
+        const d = new Date()
+        const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+        const daysLeft = lastDay - d.getDate()
+        if (daysLeft > 3) return null
+        return (
+          <div className="bg-amber-50 border-2 border-amber-500/60 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="font-extrabold text-sm text-amber-300">
+                📅 {lang === 'en' ? `Monthly Stocktake Reminder (${daysLeft === 0 ? 'Last day of month!' : `${daysLeft} days left`})` : `تذكير الجرد الشهري للمخزون (${daysLeft === 0 ? 'اليوم الأخير في الشهر!' : `متبقي ${daysLeft} أيام على نهاية الشهر`})`}
+              </div>
+              <div className="text-xs opacity-80">
+                {lang === 'en' ? 'Open Inventory -> Stocktake & Waste to count all materials in one fast table.' : 'افتح تبويب (المخزن والوصفات ← الجرد الفعلي والهالك) لجرد جميع الخامات دفعة واحدة.'}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+      
+      {expiringItems.length > 0 && (
         <div className="bg-orange-50 dark:bg-orange-950/40 border-2 border-orange-400 p-4 rounded-2xl space-y-2">
           <div className="font-extrabold text-sm text-orange-900 dark:text-orange-300 flex items-center gap-1.5">
             ⏳ {lang === 'en' ? `Expiry Alerts (${expiringItems.length} items expiring within 7 days)` : `تنبيهات انتهاء الصلاحية (${expiringItems.length} خامات قريبة الانتهاء أو منتهية)`}
