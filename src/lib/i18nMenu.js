@@ -87,12 +87,24 @@ const AR_TO_EN = {
   'مل': 'ml',
   'حبة': 'pcs',
   'أضف +': 'Add +',
-  'تحويل خامات من فرع إلى فرع 🔄': 'Transfer Stock Between Branches 🔄',
-  'سجل التحويل': 'Transfer History',
-  'الجرد الفعلي وحساب العجز / الفائض 1.': '1. Physical Stocktake & Variance',
-  'تسجيل تلف / هالك / ضيافة 2.': '2. Record Waste / Spoilage',
+  'تحويل خامات من فرع إلى فرع': 'Transfer Stock Between Branches',
+  'سجل التحويل': 'Record Transfer',
+  'الجرد الفعلي وحساب العجز / الفائض': '1. Physical Stocktake & Variance',
+  'تسجيل تلف / هالك / ضيافة': '2. Record Waste / Spoilage',
   'سجل تسويات الجرد والهالك': 'Stocktake & Waste Log',
+  'اختر الخامة لجردها': 'Select Ingredient to Count',
+  'الخامة التالفة': 'Damaged Ingredient',
+  'الكمية التالفة': 'Damaged Quantity',
+  'السبب': 'Reason',
+  'تالف / انتهاء صلاحية': 'Damaged / Expired',
+  'اعتماد الجرد وتسوية الرصيد': 'Confirm Stocktake & Adjust',
+  'خصم التالف من المخزون': 'Deduct Waste from Stock',
+  'مسح الورقة بالكاميرا (OCR)': 'Scan Sheet with Camera (OCR)',
+  '-- اختر الخامة --': '-- Select Ingredient --',
+  'الفرع الرئيسي - صلالة': 'Main Branch - Salalah',
 }
+
+const SORTED_KEYS = Object.keys(AR_TO_EN).sort((a, b) => b.length - a.length)
 
 export function tCat(cat, lang) {
   if (lang !== 'en') return cat
@@ -127,23 +139,28 @@ export function installAutoTranslator() {
       const raw = node.nodeValue
       if (!raw || !raw.trim()) return
       if (!node.__origText) node.__origText = raw
-      const base = node.__origText.trim()
-      if (base === 'عربي' || base === 'EN') return
-      const lead = (node.__origText.match(/^\s*/) || [''])
-      const trail = (node.__origText.match(/\s*$/) || [''])
+      const orig = node.__origText
+      const trimmed = orig.trim()
+      if (trimmed === 'عربي' || trimmed === 'EN') return
 
       if (lang === 'en') {
-        if (AR_TO_EN[base]) {
-          const next = lead + AR_TO_EN[base] + trail
-          if (node.nodeValue !== next) node.nodeValue = next
+        let translated = orig
+        if (AR_TO_EN[trimmed]) {
+          translated = orig.replace(trimmed, AR_TO_EN[trimmed])
+        } else if (/[\u0600-\u06FF]/.test(orig)) {
+          for (const k of SORTED_KEYS) {
+            if (translated.includes(k)) {
+              translated = translated.split(k).join(AR_TO_EN[k])
+            }
+          }
         }
+        if (node.nodeValue !== translated) node.nodeValue = translated
       } else {
-        const next = lead + base + trail
-        if (node.nodeValue !== next) node.nodeValue = next
+        if (node.nodeValue !== orig) node.nodeValue = orig
       }
       return
     }
-    if (node.nodeType === 1 && !['SCRIPT', 'STYLE', 'INPUT', 'TEXTAREA', 'SELECT'].includes(node.tagName)) {
+    if (node.nodeType === 1 && !['SCRIPT', 'STYLE', 'INPUT', 'TEXTAREA'].includes(node.tagName)) {
       node.childNodes.forEach((child) => translateNode(child, lang))
     }
   }
@@ -154,5 +171,5 @@ export function installAutoTranslator() {
     translateNode(document.body, lang)
   }
 
-  setInterval(run, 350)
+  setInterval(run, 300)
 }
