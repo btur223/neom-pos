@@ -354,7 +354,14 @@ const SEED_RECIPES = [
   { itemName: 'عصير تانك مانجو', lines: [{ name: 'عصير تانك مانجو', qty: 370 }, { name: 'سكر خشن', qty: 440 }] },
   { itemName: 'عصير فيمتو', lines: [{ name: 'فيمتو', qty: 500 }, { name: 'سكر خشن', qty: 440 }] },
   ]
-const { data: shipments } = useLiveShared('shipments', { order: '-createdAt', limit: 200 })
+
+export function DashboardScreen({ invoices = [], ingredients = [], recipes = [], shifts = [], settings, features = {}, currentBranch = 'الفرع الرئيسي - صلالة', lang = 'ar' }) {
+  const { data: expenses } = useLiveShared('expenses', { order: '-createdAt', limit: 200 })
+  const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 200 })
+  const { data: items } = useLiveShared('items')
+  const { data: customers } = useLiveShared('customers')
+  const { data: feedbacks } = useLiveShared('feedbacks', { order: '-created_at', limit: 50 })
+ const { data: shipments } = useLiveShared('shipments', { order: '-createdAt', limit: 200 })
 
   const expiringItems = useMemo(() => {
     const today = new Date()
@@ -366,13 +373,6 @@ const { data: shipments } = useLiveShared('shipments', { order: '-createdAt', li
       isExpired: s.expiry_date < todayIso,
     }))
   }, [shipments])
-export function DashboardScreen({ invoices = [], ingredients = [], recipes = [], shifts = [], settings, features = {}, currentBranch = 'الفرع الرئيسي - صلالة', lang = 'ar' }) {
-  const { data: expenses } = useLiveShared('expenses', { order: '-createdAt', limit: 200 })
-  const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 200 })
-  const { data: items } = useLiveShared('items')
-  const { data: customers } = useLiveShared('customers')
-  const { data: feedbacks } = useLiveShared('feedbacks', { order: '-created_at', limit: 50 })
-  const { data: auditLogs } = useLiveShared('audit_logs', { order: '-created_at', limit: 100 })
   const [expTitle, setExpTitle] = useState('')
   const [expAmount, setExpAmount] = useState('')
   const [expImage, setExpImage] = useState('')
