@@ -76,7 +76,6 @@ const AR_TO_EN = {
   'فانيليا': 'Vanilla',
   'ليمون': 'Lemon',
   'نعناع': 'Mint',
-  'سفن اب': '7Up',
   'فيمتو': 'Vimto',
   'كنافة': 'Kunafa',
   'قشطة': 'Cream (Qishta)',
@@ -87,13 +86,12 @@ const AR_TO_EN = {
   'لتر': 'L',
   'مل': 'ml',
   'حبة': 'pcs',
-}
-
-const EN_TO_AR = {
-  'System Features Control (Toggle On/Off)': 'التحكم بميزات النظام (تشغيل / إيقاف)',
-  'Enable the features you need now and turn off the rest to keep the interface simple.': 'فعّل الميزات التي تحتاجها الآن وأوقف البقية لتبقى الواجهة بسيطة وسريعة.',
-  'Active ✓': 'مفعّل ✓',
-  'Off': 'متوقف',
+  'أضف +': 'Add +',
+  'تحويل خامات من فرع إلى فرع 🔄': 'Transfer Stock Between Branches 🔄',
+  'سجل التحويل': 'Transfer History',
+  'الجرد الفعلي وحساب العجز / الفائض 1.': '1. Physical Stocktake & Variance',
+  'تسجيل تلف / هالك / ضيافة 2.': '2. Record Waste / Spoilage',
+  'سجل تسويات الجرد والهالك': 'Stocktake & Waste Log',
 }
 
 export function tCat(cat, lang) {
@@ -109,6 +107,16 @@ export function tItem(item, lang) {
   return AR_TO_EN[name] || name
 }
 
+function detectCurrentLang() {
+  const btns = document.querySelectorAll('button')
+  for (const b of btns) {
+    const txt = (b.textContent || '').trim()
+    if (txt === 'عربي') return 'en'
+    if (txt === 'EN') return 'ar'
+  }
+  return document.documentElement.lang === 'en' ? 'en' : 'ar'
+}
+
 export function installAutoTranslator() {
   if (typeof window === 'undefined' || window.__neomAutoTranslatorInstalled) return
   window.__neomAutoTranslatorInstalled = true
@@ -120,8 +128,9 @@ export function installAutoTranslator() {
       if (!raw || !raw.trim()) return
       if (!node.__origText) node.__origText = raw
       const base = node.__origText.trim()
-      const lead = node.__origText.match(/^\s*/)[0]
-      const trail = node.__origText.match(/\s*$/)[0]
+      if (base === 'عربي' || base === 'EN') return
+      const lead = (node.__origText.match(/^\s*/) || [''])
+      const trail = (node.__origText.match(/\s*$/) || [''])
 
       if (lang === 'en') {
         if (AR_TO_EN[base]) {
@@ -129,9 +138,7 @@ export function installAutoTranslator() {
           if (node.nodeValue !== next) node.nodeValue = next
         }
       } else {
-        const cleaned = base.replace(/\s*\([A-Za-z\s&/+-]+\)\s*/g, '').trim()
-        const target = EN_TO_AR[base] || (cleaned !== base ? cleaned : base)
-        const next = lead + target + trail
+        const next = lead + base + trail
         if (node.nodeValue !== next) node.nodeValue = next
       }
       return
@@ -142,14 +149,10 @@ export function installAutoTranslator() {
   }
 
   const run = () => {
-    const lang = document.documentElement.lang === 'en' || document.documentElement.dir === 'ltr' ? 'en' : 'ar'
+    if (!document.body) return
+    const lang = detectCurrentLang()
     translateNode(document.body, lang)
   }
 
-  const observer = new MutationObserver(() => run())
-  window.addEventListener('DOMContentLoaded', () => {
-    run()
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true })
-  })
-  setInterval(run, 600)
+  setInterval(run, 350)
 }
