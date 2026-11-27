@@ -6,6 +6,7 @@ import { useLiveShared } from './lib/useLive'
 import TeamLogin from './components/TeamLogin'
 import { DashboardScreen, InventoryScreen, SettingsScreen } from './AdminScreens'
 import { scanDocumentOcr } from './lib/ocr'
+import { tCat, tItem } from './lib/i18nMenu'
 
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const fmt = (n) => Number(n || 0).toFixed(3)
@@ -545,7 +546,7 @@ const [nowTick, setNowTick] = useState(Date.now())
           <div className="flex gap-1 overflow-x-auto pb-0.5 w-full">
             {cats.map((c) => (
               <button key={c} onClick={() => setCat(c)} className={`px-2.5 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap ${cat === c ? 'bg-[#123B36] text-white' : 'bg-[#F4F1EA]'}`}>
-                {c}
+                {tCat(c, lang)}
               </button>
             ))}
           </div>
@@ -556,7 +557,7 @@ const [nowTick, setNowTick] = useState(Date.now())
             {filtered.map((item) => (
               <button key={item.id} onClick={() => handleItemClick(item)} className="bg-white p-2 rounded-xl shadow-xs border border-[#123B36]/10 text-right flex flex-col justify-between hover:border-[#123B36]/40 transition min-h-[66px]">
                 <div>
-                  <span className="font-bold text-xs leading-tight block line-clamp-2">{lang === 'en' && item.name_en ? item.name_en : item.name}</span>
+                  <span className="font-bold text-xs leading-tight block line-clamp-2">{tItem(item, lang)}</span>
                   {item.name_en && <span className="text-[10px] text-[#123B36]/55 block truncate">{lang === 'en' ? item.name : item.name_en}</span>}
                 </div>
                 <span className="text-[11px] font-extrabold text-amber-700 mt-1">{fmt(item.price)} {currency}</span>
