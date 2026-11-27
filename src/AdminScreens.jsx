@@ -1522,196 +1522,95 @@ const [ocrScanning, setOcrScanning] = useState(false)
         </div>
       )}
 
-      {subTab === 'waste' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <form onSubmit={handleStocktake} className="bg-white p-4 rounded-2xl shadow-sm space-y-3 text-xs">
-            <h3 className="font-extrabold text-sm text-[#123B36]">
-              {(!isManager && features.blindStocktake) ? '1. الجرد الفعلي الأعمى (أدخل الكمية المعدودة فقط)' : '1. الجرد الفعلي وحساب العجز / الفائض'}
+      {subTab === 'audit' && (
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm space-y-4 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-extrabold text-sm text-[#123B36] dark:text-white">
+              {lang === 'en' ? '1. Bulk Physical Stocktake (Foodics Style)' : '1. الجرد الفعلي الجماعي السريع (دفعة واحدة)'}
             </h3>
-            <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3 py-1.5 rounded-xl font-extrabold cursor-pointer text-[11px]">
-  <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3 text-xs">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-extrabold text-sm">
-                {lang === 'en' ? '1. Bulk Physical Stocktake (Foodics Style)' : '1. الجرد الفعلي الجماعي السريع (دفعة واحدة)'}
-              </h3>
-              <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3 py-1.5 rounded-xl font-extrabold cursor-pointer">
-                <Camera size={14} />
-                <span>{ocrScanning ? (lang === 'en' ? 'Reading...' : 'جاري القراءة...') : (lang === 'en' ? 'Scan Sheet (OCR)' : 'مسح الورقة بالكاميرا (OCR)')}</span>
-                <input type="file" accept="image/*" capture="environment" onChange={(e) => handleOcrInventory(e, 'audit')} className="hidden" />
-              </label>
-            </div>
-
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={lang === 'en' ? 'Search ingredient name...' : '🔍 ابحث باسم الخامة للوصول السريع...'}
-              className="w-full px-3 py-2 rounded-xl border text-xs"
-            />
-
-            <div className="max-h-[420px] overflow-y-auto rounded-xl border border-amber-500/20">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-[#F4F1EA] sticky top-0 z-10 font-extrabold">
-                  <tr>
-                    <th className="p-2.5">{lang === 'en' ? 'Ingredient' : 'الخامة'}</th>
-                    {(!isManager || !features.blindStocktake) && (
-                      <th className="p-2.5">{lang === 'en' ? 'System Stock' : 'الرصيد الدفتري'}</th>
-                    )}
-                    <th className="p-2.5 w-32">{lang === 'en' ? 'Actual Count' : 'الرصيد الفعلي'}</th>
-                    {(!isManager || !features.blindStocktake) && (
-                      <th className="p-2.5">{lang === 'en' ? 'Variance' : 'الفرق'}</th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-amber-500/10">
-                  {ingredients
-                    .filter((ing) => !search || (ing.name || '').includes(search))
-                    .map((ing) => {
-                      const val = (window.__bulkAudit || {})[ing.id] ?? ''
-                      const hasVal = val !== '' && !Number.isNaN(Number(val))
-                      const diff = hasVal ? Number((Number(val) - Number(ing.stock || 0)).toFixed(3)) : null
-                      return (
-                        <tr key={ing.id} className={hasVal ? 'bg-amber-500/10' : ''}>
-                          <td className="p-2 font-bold">
-                            {ing.name} <span className="opacity-60 text-[10px]">({ing.unit})</span>
-                          </td>
-                          {(!isManager || !features.blindStocktake) && (
-                            <td className="p-2 font-bold opacity-80">
-                              {Number(ing.stock || 0).toLocaleString()} {ing.unit}
-                            </td>
-                          )}
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              step="any"
-                              defaultValue={val}
-                              placeholder={lang === 'en' ? 'Count...' : 'أدخل الفعلي'}
-                              onChange={(e) => {
-                                window.__bulkAudit = window.__bulkAudit || {}
-                                window.__bulkAudit[ing.id] = e.target.value
-                                setAuditSentMsg(e.target.value ? ' ' : '')
-                              }}
-                              className="w-full px-2.5 py-1.5 rounded-lg border font-extrabold text-xs"
-                            />
-                          </td>
-                          {(!isManager || !features.blindStocktake) && (
-                            <td className="p-2 font-extrabold">
-                              {diff === null ? (
-                                <span className="opacity-40">—</span>
-                              ) : diff < 0 ? (
-                                <span className="text-red-400">عجز {diff} {ing.unit}</span>
-                              ) : diff > 0 ? (
-                                <span className="text-emerald-400">فائض +{diff} {ing.unit}</span>
-                              ) : (
-                                <span className="text-amber-300">مطابق ✓</span>
-                              )}
-                            </td>
-                          )}
-                        </tr>
-                      )
-                    })}
-                </tbody>
-              </table>
-            </div>
-
-            {auditSentMsg && auditSentMsg.trim() && (
-              <div className="text-emerald-400 font-extrabold bg-emerald-950/50 border border-emerald-500/40 p-2.5 rounded-xl">
-                {auditSentMsg}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={async () => {
-                const map = window.__bulkAudit || {}
-                const entries = Object.entries(map).filter(([, v]) => v !== '' && !Number.isNaN(Number(v)))
-                if (!entries.length) {
-                  alert(lang === 'en' ? 'Enter at least one actual count first.' : 'أدخل الرصيد الفعلي لخامة واحدة على الأقل أولاً.')
-                  return
-                }
-                for (const [id, rawVal] of entries) {
-                  const ing = ingredients.find((i) => String(i.id) === String(id))
-                  if (!ing) continue
-                  const actual = Number(rawVal)
-                  const diff = Number((actual - Number(ing.stock || 0)).toFixed(3))
-                  await db.updateShared('ingredients', ing.id, { stock: actual })
-                  await db.insertShared('stock_adjustments', {
-                    ingredient_id: ing.id,
-                    ingredient_name: ing.name,
-                    system_stock: Number(ing.stock || 0),
-                    actual_stock: actual,
-                    diff,
-                    unit: ing.unit,
-                    type: 'audit',
-                    reason: 'جرد شهري جماعي',
-                    created_at: new Date().toISOString(),
-                  })
-                }
-                window.__bulkAudit = {}
-                setAuditSentMsg(
-                  lang === 'en'
-                    ? `Updated ${entries.length} ingredients successfully!`
-                    : `✓ تم اعتماد الجرد وتحديث أرصدة ${entries.length} خامة دفعة واحدة!`
-                )
-              }}
-              className="w-full bg-[#123B36] text-white py-3 rounded-xl font-extrabold text-sm"
-            >
-              {(!isManager && features.blindStocktake)
-                ? (lang === 'en' ? 'Send Blind Stocktake to Owner' : 'إرسال الجرد الأعمى للمالك')
-                : (lang === 'en' ? 'Confirm All Counts & Update Stock' : 'اعتماد جميع أرصدة الجرد دفعة واحدة ✓')}
-            </button>
+            <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3 py-1.5 rounded-xl font-extrabold cursor-pointer text-xs">
+              <span>{ocrScanning ? 'Reading...' : 'Scan Sheet (OCR)'}</span>
+              <input type="file" accept="image/*" capture="environment" onChange={(e) => handleOcrInventory(e)} className="hidden" />
+            </label>
           </div>
 
-          <form onSubmit={handleAddWaste} className="bg-white p-4 rounded-2xl shadow-sm space-y-3 text-xs">
-            <h3 className="font-extrabold text-sm text-red-700">2. تسجيل تالف / هالك / ضيافة</h3>
-            <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3 py-1.5 rounded-xl font-extrabold cursor-pointer text-[11px]">
-  <Camera size={14} />
-  <span>{ocrScanning ? '⏳ جاري القراءة...' : '📸 مسح الورقة بالكاميرا (OCR)'}</span>
-  <input type="file" accept="image/*" capture="environment" onChange={(e) => handleOcrInventory(e, 'waste')} className="hidden" />
-</label>
-            <div>
-              <label className="block font-bold mb-1">الخامة التالفة:</label>
-              <select value={wasteIngId} onChange={(e) => setWasteIngId(e.target.value)} required className="w-full bg-[#F4F1EA] px-3 py-2.5 rounded-xl outline-none font-bold">
-                <option value="">-- اختر الخامة --</option>
-                {ingredients.map((i) => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block font-bold mb-1">الكمية التالفة:</label>
-                <input type="number" step="any" value={wasteQty} onChange={(e) => setWasteQty(e.target.value)} required className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl outline-none font-bold" />
-              </div>
-              <div>
-                <label className="block font-bold mb-1">السبب:</label>
-                <select value={wasteReason} onChange={(e) => setWasteReason(e.target.value)} className="w-full bg-[#F4F1EA] px-3 py-2 rounded-xl outline-none font-bold">
-                  <option value="تالف / انتهاء صلاحية">تالف / انتهاء صلاحية</option>
-                  <option value="انسكاب / خطأ تحضير">انسكاب / خطأ تحضير</option>
-                  <option value="ضيافة مجانية">ضيافة مجانية</option>
-                </select>
-              </div>
-            </div>
-            <button type="submit" className="w-full bg-red-600 text-white py-2.5 rounded-xl font-extrabold">خصم التالف من المخزون</button>
-          </form>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={lang === 'en' ? 'Search ingredient name...' : 'ابحث باسم الخامة للوصول السريع...'}
+            className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-slate-600 bg-[#F4F1EA] dark:bg-slate-800 text-[#123B36] dark:text-white text-xs"
+          />
 
-          {(isManager || !features.blindStocktake) && (
-            <div className="lg:col-span-2 bg-white p-4 rounded-2xl shadow-sm space-y-2 text-xs">
-              <h3 className="font-extrabold text-sm">سجل تسويات الجرد والهالك</h3>
-              <div className="max-h-56 overflow-y-auto space-y-1.5">
-                {(wasteLogs || []).map((w) => (
-                  <div key={w.id} className="flex justify-between items-center bg-[#F4F1EA] px-3 py-2 rounded-xl">
-                    <div>
-                      <span className="font-extrabold">{w.ingredient_name}</span> • <span className="text-[#123B36]/70">{w.reason} ({w.date})</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`font-extrabold ${Number(w.qty) < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{Number(w.qty) > 0 ? `+${w.qty}` : w.qty} {w.unit}</span>
-                      {Number(w.cost_loss) > 0 && <span className="text-red-700 font-bold">(-{fmt(w.cost_loss)} {currency})</span>}
-                      <button onClick={() => db.deleteShared('waste_logs', w.id)} className="text-red-500"><Trash2 size={14} /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="max-h-[420px] overflow-y-auto rounded-xl border border-amber-500/20">
+            <table className="w-full text-right text-xs">
+              <thead className="bg-[#F4F1EA] dark:bg-slate-800 sticky top-0 z-10 font-extrabold text-[#123B36] dark:text-slate-200">
+                <tr>
+                  <th className="p-2.5">{lang === 'en' ? 'Ingredient' : 'الخامة'}</th>
+                  {(isManager || !features.blindStocktake) && (
+                    <th className="p-2.5">{lang === 'en' ? 'System Stock' : 'الرصيد الدفتري'}</th>
+                  )}
+                  <th className="p-2.5 w-32">{lang === 'en' ? 'Actual Count' : 'الرصيد الفعلي'}</th>
+                  {(isManager || !features.blindStocktake) && (
+                    <th className="p-2.5">{lang === 'en' ? 'Variance' : 'الفرق'}</th>
+                  )}
+                  <th className="p-2.5">{lang === 'en' ? 'Reason' : 'السبب'}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                {(ingredients || [])
+                  .filter((i) => !search || (i.name || '').toLowerCase().includes(search.toLowerCase()))
+                  .map((ing) => {
+                    const sysStock = Number(ing.stock || 0)
+                    const rawActual = auditCounts?.[ing.id]
+                    const hasInput = rawActual !== undefined && rawActual !== ''
+                    const diff = hasInput ? Number(rawActual) - sysStock : 0
+                    return (
+                      <tr key={ing.id} className="hover:bg-amber-50/40 dark:hover:bg-slate-800/50">
+                        <td className="p-2.5 font-extrabold text-[#123B36] dark:text-white">{ing.name}</td>
+                        {(isManager || !features.blindStocktake) && (
+                          <td className="p-2.5 font-bold text-[#123B36]/80 dark:text-slate-300">
+                            {sysStock.toLocaleString()} {ing.unit}
+                          </td>
+                        )}
+                        <td className="p-2.5">
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder={String(sysStock)}
+                            value={rawActual ?? ''}
+                            onChange={(e) => setAuditCounts({ ...auditCounts, [ing.id]: e.target.value })}
+                            className="w-28 bg-white dark:bg-slate-800 text-[#123B36] dark:text-white px-2.5 py-1.5 rounded-xl border border-gray-300 dark:border-slate-600 font-extrabold"
+                          />
+                        </td>
+                        {(isManager || !features.blindStocktake) && (
+                          <td className={`p-2.5 font-extrabold ${!hasInput || diff === 0 ? 'text-gray-400' : diff < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {!hasInput || diff === 0 ? '0' : `${diff > 0 ? '+' : ''}${diff.toLocaleString()} ${ing.unit}`}
+                          </td>
+                        )}
+                        <td className="p-2.5">
+                          <input
+                            type="text"
+                            placeholder={lang === 'en' ? 'Note...' : 'سبب الفرق...'}
+                            value={auditNotes?.[ing.id] ?? ''}
+                            onChange={(e) => setAuditNotes({ ...auditNotes, [ing.id]: e.target.value })}
+                            className="w-full min-w-[120px] bg-white dark:bg-slate-800 text-[#123B36] dark:text-white px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-slate-700"
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleStockAudit}
+            className="bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-xl font-extrabold text-xs"
+          >
+            ✅ {lang === 'en' ? 'Save Audit & Update Stock' : 'اعتماد الجرد وتحديث المخزن'}
+          </button>
         </div>
       )}
 
