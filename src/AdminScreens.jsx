@@ -1529,42 +1529,138 @@ const [ocrScanning, setOcrScanning] = useState(false)
               {(!isManager && features.blindStocktake) ? '1. الجرد الفعلي الأعمى (أدخل الكمية المعدودة فقط)' : '1. الجرد الفعلي وحساب العجز / الفائض'}
             </h3>
             <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3 py-1.5 rounded-xl font-extrabold cursor-pointer text-[11px]">
-  <Camera size={14} />
-  <span>{ocrScanning ? '⏳ جاري القراءة...' : '📸 مسح الورقة بالكاميرا (OCR)'}</span>
-  <input type="file" accept="image/*" capture="environment" onChange={(e) => handleOcrInventory(e, 'audit')} className="hidden" />
-</label>
-            <div>
-              <label className="block font-bold mb-1">اختر الخامة لجردها:</label>
-              <select value={auditIngId} onChange={(e) => { setAuditIngId(e.target.value); setActualQty('') }} className="w-full bg-[#F4F1EA] px-3 py-2.5 rounded-xl outline-none font-bold">
-                <option value="">-- اختر الخامة --</option>
-                {ingredients.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name} {(isManager || !features.blindStocktake) ? `(الدفتري: ${i.stock} ${i.unit})` : `(${i.unit})`}
-                  </option>
-                ))}
-              </select>
+  <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-extrabold text-sm">
+                {lang === 'en' ? '1. Bulk Physical Stocktake (Foodics Style)' : '1. الجرد الفعلي الجماعي السريع (دفعة واحدة)'}
+              </h3>
+              <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3 py-1.5 rounded-xl font-extrabold cursor-pointer">
+                <Camera size={14} />
+                <span>{ocrScanning ? (lang === 'en' ? 'Reading...' : 'جاري القراءة...') : (lang === 'en' ? 'Scan Sheet (OCR)' : 'مسح الورقة بالكاميرا (OCR)')}</span>
+                <input type="file" accept="image/*" capture="environment" onChange={(e) => handleOcrInventory(e, 'audit')} className="hidden" />
+              </label>
             </div>
-            {selectedAuditIng && (
-              <div className="bg-[#F4F1EA] p-3 rounded-xl space-y-2">
-                {(isManager || !features.blindStocktake) && (
-                  <div className="flex justify-between"><span>الرصيد المسجل في النظام:</span><b>{selectedAuditIng.stock} {selectedAuditIng.unit}</b></div>
-                )}
-                <div>
-                  <label className="block font-bold mb-1">الكمية الفعلية الموجودة على الرف ({selectedAuditIng.unit}):</label>
-                  <input type="number" step="any" value={actualQty} onChange={(e) => setActualQty(e.target.value)} required className="w-full bg-white px-3 py-2 rounded-lg border font-bold" />
-                </div>
-                {(isManager || !features.blindStocktake) && auditDiff !== null && (
-                  <div className={`p-2 rounded-lg font-extrabold text-center ${auditDiff < 0 ? 'bg-red-100 text-red-700' : auditDiff > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
-                    {auditDiff < 0 ? `يوجد عجز: ${auditDiff} ${selectedAuditIng.unit}` : auditDiff > 0 ? `يوجد فائض: +${auditDiff} ${selectedAuditIng.unit}` : 'الرصيد مطابق تماماً (0 فرق)'}
-                  </div>
-                )}
+
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={lang === 'en' ? 'Search ingredient name...' : '🔍 ابحث باسم الخامة للوصول السريع...'}
+              className="w-full px-3 py-2 rounded-xl border text-xs"
+            />
+
+            <div className="max-h-[420px] overflow-y-auto rounded-xl border border-amber-500/20">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-[#F4F1EA] sticky top-0 z-10 font-extrabold">
+                  <tr>
+                    <th className="p-2.5">{lang === 'en' ? 'Ingredient' : 'الخامة'}</th>
+                    {(!isManager || !features.blindStocktake) && (
+                      <th className="p-2.5">{lang === 'en' ? 'System Stock' : 'الرصيد الدفتري'}</th>
+                    )}
+                    <th className="p-2.5 w-32">{lang === 'en' ? 'Actual Count' : 'الرصيد الفعلي'}</th>
+                    {(!isManager || !features.blindStocktake) && (
+                      <th className="p-2.5">{lang === 'en' ? 'Variance' : 'الفرق'}</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-500/10">
+                  {ingredients
+                    .filter((ing) => !search || (ing.name || '').includes(search))
+                    .map((ing) => {
+                      const val = (window.__bulkAudit || {})[ing.id] ?? ''
+                      const hasVal = val !== '' && !Number.isNaN(Number(val))
+                      const diff = hasVal ? Number((Number(val) - Number(ing.stock || 0)).toFixed(3)) : null
+                      return (
+                        <tr key={ing.id} className={hasVal ? 'bg-amber-500/10' : ''}>
+                          <td className="p-2 font-bold">
+                            {ing.name} <span className="opacity-60 text-[10px]">({ing.unit})</span>
+                          </td>
+                          {(!isManager || !features.blindStocktake) && (
+                            <td className="p-2 font-bold opacity-80">
+                              {Number(ing.stock || 0).toLocaleString()} {ing.unit}
+                            </td>
+                          )}
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              step="any"
+                              defaultValue={val}
+                              placeholder={lang === 'en' ? 'Count...' : 'أدخل الفعلي'}
+                              onChange={(e) => {
+                                window.__bulkAudit = window.__bulkAudit || {}
+                                window.__bulkAudit[ing.id] = e.target.value
+                                setAuditSentMsg(e.target.value ? ' ' : '')
+                              }}
+                              className="w-full px-2.5 py-1.5 rounded-lg border font-extrabold text-xs"
+                            />
+                          </td>
+                          {(!isManager || !features.blindStocktake) && (
+                            <td className="p-2 font-extrabold">
+                              {diff === null ? (
+                                <span className="opacity-40">—</span>
+                              ) : diff < 0 ? (
+                                <span className="text-red-400">عجز {diff} {ing.unit}</span>
+                              ) : diff > 0 ? (
+                                <span className="text-emerald-400">فائض +{diff} {ing.unit}</span>
+                              ) : (
+                                <span className="text-amber-300">مطابق ✓</span>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      )
+                    })}
+                </tbody>
+              </table>
+            </div>
+
+            {auditSentMsg && auditSentMsg.trim() && (
+              <div className="text-emerald-400 font-extrabold bg-emerald-950/50 border border-emerald-500/40 p-2.5 rounded-xl">
+                {auditSentMsg}
               </div>
             )}
-            {auditSentMsg && <div className="text-emerald-700 font-extrabold bg-emerald-50 p-2 rounded-lg">✓ تم إرسال نتيجة الجرد الفعلي للمالك بنجاح!</div>}
-            <button type="submit" className="w-full bg-[#123B36] text-white py-2.5 rounded-xl font-extrabold">
-              {(!isManager && features.blindStocktake) ? 'إرسال نتيجة الجرد للمالك' : 'اعتماد الجرد وتسوية الرصيد'}
+
+            <button
+              type="button"
+              onClick={async () => {
+                const map = window.__bulkAudit || {}
+                const entries = Object.entries(map).filter(([, v]) => v !== '' && !Number.isNaN(Number(v)))
+                if (!entries.length) {
+                  alert(lang === 'en' ? 'Enter at least one actual count first.' : 'أدخل الرصيد الفعلي لخامة واحدة على الأقل أولاً.')
+                  return
+                }
+                for (const [id, rawVal] of entries) {
+                  const ing = ingredients.find((i) => String(i.id) === String(id))
+                  if (!ing) continue
+                  const actual = Number(rawVal)
+                  const diff = Number((actual - Number(ing.stock || 0)).toFixed(3))
+                  await db.updateShared('ingredients', ing.id, { stock: actual })
+                  await db.insertShared('stock_adjustments', {
+                    ingredient_id: ing.id,
+                    ingredient_name: ing.name,
+                    system_stock: Number(ing.stock || 0),
+                    actual_stock: actual,
+                    diff,
+                    unit: ing.unit,
+                    type: 'audit',
+                    reason: 'جرد شهري جماعي',
+                    created_at: new Date().toISOString(),
+                  })
+                }
+                window.__bulkAudit = {}
+                setAuditSentMsg(
+                  lang === 'en'
+                    ? `Updated ${entries.length} ingredients successfully!`
+                    : `✓ تم اعتماد الجرد وتحديث أرصدة ${entries.length} خامة دفعة واحدة!`
+                )
+              }}
+              className="w-full bg-[#123B36] text-white py-3 rounded-xl font-extrabold text-sm"
+            >
+              {(!isManager && features.blindStocktake)
+                ? (lang === 'en' ? 'Send Blind Stocktake to Owner' : 'إرسال الجرد الأعمى للمالك')
+                : (lang === 'en' ? 'Confirm All Counts & Update Stock' : 'اعتماد جميع أرصدة الجرد دفعة واحدة ✓')}
             </button>
-          </form>
+          </div>
 
           <form onSubmit={handleAddWaste} className="bg-white p-4 rounded-2xl shadow-sm space-y-3 text-xs">
             <h3 className="font-extrabold text-sm text-red-700">2. تسجيل تالف / هالك / ضيافة</h3>
