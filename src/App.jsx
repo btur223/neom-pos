@@ -274,7 +274,7 @@ const settings = (settingsList && settingsList.length > 0) ? settingsList.at(0) 
   const canCheckout = isManager || !!perms.pos
   const canDiscount = isManager || !!perms.discount
   const canVoidItem = isManager || !!perms.voidItem
-
+const [splitCount, setSplitCount] = useState(1)
   const subTotal = cart.reduce((s, l) => s + l.price * l.qty, 0)
   const extraDiscount = canDiscount ? Number(manualDiscount || 0) : 0
   const couponDiscount = appliedCoupon ? (appliedCoupon.type === 'percent' ? (subTotal * Number(appliedCoupon.value)) / 100 : Number(appliedCoupon.value)) : 0
@@ -703,7 +703,23 @@ const [nowTick, setNowTick] = useState(Date.now())
               )}
             </div>
           )}
-
+{total > 0 && (
+              <div className="bg-[#F4F1EA] dark:bg-slate-800 p-2 rounded-xl text-[11px] flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-[#123B36] dark:text-slate-300">{lang === 'en' ? 'Split:' : 'تقسيم الفاتورة:'}</span>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} type="button" onClick={() => setSplitCount(n)} className={`w-6 h-6 rounded-lg font-extrabold text-[11px] ${splitCount === n ? 'bg-[#123B36] text-white' : 'bg-white dark:bg-slate-700 text-[#123B36] dark:text-white'}`}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                {splitCount > 1 && (
+                  <span className="font-extrabold text-amber-800 dark:text-amber-300">
+                    {fmt(total / splitCount)} {currency} / {lang === 'en' ? 'person' : 'شخص'}
+                  </span>
+                )}
+              </div>
+            )}
           {totalDiscount > 0 && (
             <div className="flex justify-between text-xs font-bold text-red-600">
               <span>{lang === 'en' ? 'Discount:' : 'إجمالي الخصم:'}</span>
