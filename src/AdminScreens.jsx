@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react'
-import { Plus, Trash2, Send, AlertTriangle, Edit3, Sparkles, CheckCircle2, Receipt, BookOpen, Database, Calendar, TrendingUp, Users, RotateCcw, MessageCircle, Award, UserCheck, Star, Ticket, Store } from 'lucide-react'
+import { Plus, Trash2, Send, AlertTriangle, Edit3, Sparkles, CheckCircle2, Receipt, BookOpen, Database, Calendar, TrendingUp, Users, RotateCcw, MessageCircle, Award, UserCheck, Star, Ticket, Store, Camera, Download } from 'lucide-react'
 import { db } from './lib/db'
 import { useLiveShared } from './lib/useLive'
 import { share } from './lib/share'
 import { getStaffList, saveStaffList } from './components/TeamLogin'
+import { scanDocumentOcr } from './lib/ocr'
 
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const fmt = (n) => Number(n || 0).toFixed(3)
@@ -421,7 +422,61 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
     }, 0)
   }, [periodInvoices, recipeCostMap])
 
-  const netProfit = totalSales - totalCogs - totalExpenses - totalWaste
+  const periodFixedCosts = useMemo(() => {
+    if (!features.fixedCosts) return 0
+    const costsMap = settings?.fixedCostsMap || {}
+    const monthlyTotal = branchFilter === 'all'
+      ? Object.values(costsMap).reduce((s, v) => s + Number(v || 0), 0)
+      : Number(costsMap[branchFilter] || 0)
+    if (period === 'today') return monthlyTotal / 30
+    if (period === 'week') return (monthlyTotal / 30) * 7
+    return monthlyTotal
+  }, [features.fixedCosts, settings?.fixedCostsMap, branchFilter, period])
+
+  const netProfit = totalSales - totalCogs - totalExpenses - totalWaste - periodFixedCosts
+
+  const smartReorderAlerts = useMemo(() => {
+    if (!features.smartReorder) return []
+    const last7Cutoff = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
+    const usageMap = {}
+    ;(invoices || []).filter((inv) => inv.date >= last7Cutoff).forEach((inv) => {
+      ;(inv.lines || []).forEach((l) => {
+        const rec = (recipes || []).find((r) => r.itemName === l.name)
+        ;(rec?.lines || []).forEach((rl) => {
+          usageMap[rl.name] = (usageMap[rl.name] || 0) + (Number(rl.qty || 0) * Number(l.qty || 1))
+        })
+      })
+    })
+    return (ingredients || []).map((ing) => {
+      const dailyRate = (usageMap[ing.name] || 0) / 7
+      const daysLeft = dailyRate > 0 ? Math.floor(Number(ing.stock || 0) / dailyRate) : 999
+      return { ...ing, dailyRate, daysLeft }
+    }).filter((x) => x.daysLeft <= 4).sort((a, b) => a.daysLeft - b.daysLeft)
+  }, [features.smartReorder, invoices, recipes, ingredients])
+
+  const menuEngineeringList = useMemo(() => {
+    if (!features.menuEng || !items?.length) return []
+    const soldMap = {}
+    periodInvoices.forEach((inv) => {
+      ;(inv.lines || []).forEach((l) => { soldMap[l.name] = (soldMap[l.name] || 0) + Number(l.qty || 1) })
+    })
+    const enriched = items.map((it) => {
+      const qty = soldMap[it.name] || 0
+      const profit = Number(it.price || 0) - (recipeCostMap[it.name] || 0)
+      return { ...it, qty, profit }
+    })
+    const avgQty = enriched.reduce((s, x) => s + x.qty, 0) / enriched.length
+    const avgProfit = enriched.reduce((s, x) => s + x.profit, 0) / enriched.length
+    return enriched.map((x) => {
+      const highPop = x.qty >= avgQty
+      const highProf = x.profit >= avgProfit
+      const tag = highPop && highProf ? '⭐ نجم (Star)'
+        : highPop && !highProf ? '🐎 حصان عمل (Plowhorse)'
+        : !highPop && highProf ? '🧩 لغز (Puzzle)'
+        : '⚠️ ضعيف (Dog)'
+      return { ...x, tag }
+    }).sort((a, b) => b.qty - a.qty)
+  }, [features.menuEng, items, periodInvoices, recipeCostMap])
 
   const fraudAlerts = useMemo(() => {
     const alerts = []
@@ -515,15 +570,21 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
     }).sort((a, b) => a.margin - b.margin)
   }, [items, recipeCostMap])
 
-  function handleSnapReceipt(e) {
+  const [ocrExpBusy, setOcrExpBusy] = useState(false)
+
+  async function handleSnapReceipt(e) {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      setExpImage(String(reader.result || ''))
-      if (!expTitle) setExpTitle(lang === 'en' ? 'Receipt Expense' : 'فاتورة مشتريات/صيانة')
+    setOcrExpBusy(true)
+    try {
+      const res = await scanDocumentOcr(file)
+      if (res.firstItem?.name) setExpTitle(res.firstItem.name)
+      else if (!expTitle) setExpTitle(lang === 'en' ? 'Receipt Expense' : 'فاتورة مشتريات/صيانة')
+      if (res.totalAmount) setExpAmount(res.totalAmount)
+    } finally {
+      setOcrExpBusy(false)
+      e.target.value = ''
     }
-    reader.readAsDataURL(file)
   }
 
   async function addExpense(e) {
@@ -534,13 +595,10 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
       amount: Number(expAmount),
       date: today,
       branch: branchFilter !== 'all' ? branchFilter : currentBranch,
-      receipt_img: expImage || null,
     })
     setExpTitle('')
     setExpAmount('')
-    setExpImage('')
   }
-
   async function cancelAndRestockInvoice(inv) {
     if (!confirm(lang === 'en' ? `Cancel invoice ${inv.number} and restock ingredients?` : `هل أنت متأكد من إلغاء الفاتورة ${inv.number} وإرجاع كميات الخامات للمخزون؟`)) return
     if (inv.stockDeducted && inv.lines) {
@@ -674,7 +732,37 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
           </div>
         </div>
       )}
+{features.smartReorder && smartReorderAlerts.length > 0 && (
+        <div className="bg-purple-50 border border-purple-200 p-4 rounded-2xl space-y-2">
+          <div className="font-extrabold text-purple-900 text-sm">
+            🧠 {lang === 'en' ? `Smart Reorder Alerts (${smartReorderAlerts.length})` : `تنبيهات إعادة الطلب الذكية (${smartReorderAlerts.length} خامات توشك على النفاد)`}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {smartReorderAlerts.map((ing) => (
+              <span key={ing.id} className="bg-white px-2.5 py-1 rounded-lg text-xs font-bold text-purple-900 border border-purple-200">
+                {ing.name}: متبقي {ing.daysLeft} يوم (الرصيد {ing.stock} {ing.unit})
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
+      {features.menuEng && menuEngineeringList.length > 0 && (
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10 space-y-2">
+          <h3 className="font-extrabold text-sm text-[#123B36]">⭐ {lang === 'en' ? 'Menu Engineering Matrix' : 'هندسة المنيو (تصنيف الأصناف حسب الربحية والمبيعات)'}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-52 overflow-y-auto text-xs">
+            {menuEngineeringList.map((m) => (
+              <div key={m.id} className="bg-[#F4F1EA] px-3 py-2 rounded-xl flex items-center justify-between">
+                <div>
+                  <div className="font-extrabold text-[#123B36]">{m.name}</div>
+                  <div className="text-[10px] text-[#123B36]/70">مبيعات: {m.qty} • ربح: {fmt(m.profit)}</div>
+                </div>
+                <span className="bg-white px-2 py-1 rounded-lg font-extrabold text-[10px] border border-[#123B36]/15">{m.tag}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {features.branchCompare && branchComparison.length > 1 && (
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#123B36]/10 space-y-2">
           <h3 className="font-extrabold text-sm text-[#123B36]">⚖️ {lang === 'en' ? 'Branch Performance Comparison' : 'مقارنة أداء الفروع جنباً إلى جنب'}</h3>
@@ -1020,7 +1108,36 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
 
   const selectedAuditIng = ingredients.find((i) => i.id === auditIngId)
   const auditDiff = selectedAuditIng && actualQty !== '' ? Number(actualQty) - Number(selectedAuditIng.stock || 0) : null
+const [ocrScanning, setOcrScanning] = useState(false)
 
+  async function handleOcrInventory(e, targetMode) {
+    const file = e.target.files?.
+    if (!file) return
+    setOcrScanning(true)
+    try {
+      const res = await scanDocumentOcr(file)
+      if (res.firstItem) {
+        const matched = ingredients.find((i) =>
+          i.name.includes(res.firstItem.name) ||
+          (i.name_en && i.name_en.toLowerCase().includes(res.firstItem.name.toLowerCase()))
+        )
+        if (matched) {
+          if (targetMode === 'audit') {
+            setAuditIngId(matched.id)
+            setActualQty(String(res.firstItem.qty))
+          } else {
+            setWasteIngId(matched.id)
+            setWasteQty(String(res.firstItem.qty))
+          }
+        } else {
+          alert(`تمت قراءة: "${res.firstItem.name}" (${res.firstItem.qty}) - اختر الخامة المطابقة من القائمة.`)
+        }
+      }
+    } finally {
+      setOcrScanning(false)
+      e.target.value = ''
+    }
+  }
   async function handleStocktake(e) {
     e.preventDefault()
     if (!selectedAuditIng || actualQty === '') return
@@ -1286,23 +1403,23 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
           </form>
 
           {editRec && (
-            <form onSubmit={saveEditRecipe} className="bg-amber-50 border border-amber-300 p-2.5 rounded-xl space-y-2 text-xs">
-              <div className="font-extrabold text-amber-900">{lang === 'en' ? 'Edit Recipe:' : 'تعديل مقادير:'} {editRec.itemName}</div>
-              <div className="space-y-1">
-                {(editRec.lines || []).map((line, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <span className="flex-1 font-bold">{line.name}</span>
-                    <input type="number" step="any" value={line.qty} onChange={(e) => { const updated = [...editRec.lines]; updated[idx] = { ...line, qty: e.target.value }; setEditRec({ ...editRec, lines: updated }) }} className="w-20 bg-white px-2 py-1 rounded-lg border font-bold" />
-                    <button type="button" onClick={() => setEditRec({ ...editRec, lines: editRec.lines.filter((_, i) => i !== idx) })} className="text-red-500 p-1"><Trash2 size={13} /></button>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button type="submit" className="bg-emerald-700 text-white px-2.5 py-1 rounded-lg font-bold">{lang === 'en' ? 'Save' : 'حفظ'}</button>
-                <button type="button" onClick={() => setEditRec(null)} className="bg-white px-2.5 py-1 rounded-lg border">{lang === 'en' ? 'Cancel' : 'إلغاء'}</button>
-              </div>
-            </form>
-          )}
+    <form onSubmit={saveEditRecipe} className="bg-amber-50 dark:bg-slate-900 text-[#123B36] dark:text-slate-100 border-2 border-amber-400 dark:border-amber-500/50 p-3 rounded-xl space-y-2 text-xs">
+      <div className="font-extrabold text-amber-900 dark:text-amber-300">{lang === 'en' ? 'Edit Recipe:' : 'تعديل مقادير:'} {editRec.itemName}</div>
+      <div className="space-y-1.5">
+        {(editRec.lines || []).map((line, idx) => (
+          <div key={idx} className="flex items-center gap-2 bg-white/80 dark:bg-slate-800 p-1.5 rounded-lg">
+            <span className="flex-1 font-bold text-[#123B36] dark:text-white">{line.name}</span>
+            <input type="number" step="any" value={line.qty} onChange={(e) => { const updated = [...editRec.lines]; updated[idx] = { ...line, qty: e.target.value }; setEditRec({ ...editRec, lines: updated }) }} className="w-24 bg-white dark:bg-slate-950 text-[#123B36] dark:text-amber-300 px-2 py-1 rounded-lg border border-gray-300 dark:border-slate-600 font-extrabold" />
+            <button type="button" onClick={() => setEditRec({ ...editRec, lines: editRec.lines.filter((_, i) => i !== idx) })} className="text-red-500 p-1"><Trash2 size={13} /></button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button type="submit" className="bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold">{lang === 'en' ? 'Save' : 'حفظ'}</button>
+        <button type="button" onClick={() => setEditRec(null)} className="bg-white dark:bg-slate-700 text-[#123B36] dark:text-white px-3 py-1.5 rounded-lg border dark:border-slate-600">{lang === 'en' ? 'Cancel' : 'إلغاء'}</button>
+      </div>
+    </form>
+  )}
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-[520px] overflow-y-auto">
             {recipes.filter((r) => !search || r.itemName.includes(search)).map((rec) => (
@@ -1329,6 +1446,11 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
             <h3 className="font-extrabold text-sm text-[#123B36]">
               {(!isManager && features.blindStocktake) ? '1. الجرد الفعلي الأعمى (أدخل الكمية المعدودة فقط)' : '1. الجرد الفعلي وحساب العجز / الفائض'}
             </h3>
+            <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3 py-1.5 rounded-xl font-extrabold cursor-pointer text-[11px]">
+  <Camera size={14} />
+  <span>{ocrScanning ? '⏳ جاري القراءة...' : '📸 مسح الورقة بالكاميرا (OCR)'}</span>
+  <input type="file" accept="image/*" capture="environment" onChange={(e) => handleOcrInventory(e, 'audit')} className="hidden" />
+</label>
             <div>
               <label className="block font-bold mb-1">اختر الخامة لجردها:</label>
               <select value={auditIngId} onChange={(e) => { setAuditIngId(e.target.value); setActualQty('') }} className="w-full bg-[#F4F1EA] px-3 py-2.5 rounded-xl outline-none font-bold">
@@ -1364,6 +1486,11 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
 
           <form onSubmit={handleAddWaste} className="bg-white p-4 rounded-2xl shadow-sm space-y-3 text-xs">
             <h3 className="font-extrabold text-sm text-red-700">2. تسجيل تالف / هالك / ضيافة</h3>
+            <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3 py-1.5 rounded-xl font-extrabold cursor-pointer text-[11px]">
+  <Camera size={14} />
+  <span>{ocrScanning ? '⏳ جاري القراءة...' : '📸 مسح الورقة بالكاميرا (OCR)'}</span>
+  <input type="file" accept="image/*" capture="environment" onChange={(e) => handleOcrInventory(e, 'waste')} className="hidden" />
+</label>
             <div>
               <label className="block font-bold mb-1">الخامة التالفة:</label>
               <select value={wasteIngId} onChange={(e) => setWasteIngId(e.target.value)} required className="w-full bg-[#F4F1EA] px-3 py-2.5 rounded-xl outline-none font-bold">
@@ -1587,20 +1714,45 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
   ]
 
   const PERM_OPTIONS = [
-    { key: 'pos', label: lang === 'en' ? 'POS' : 'الكاشير' },
+    { key: 'waiter', label: lang === 'en' ? 'Waiter (Order Only)' : 'ويتر (طلبات فقط)' },
+    { key: 'pos', label: lang === 'en' ? 'Cashier (POS)' : 'كاشير (بيع وتحصيل)' },
+    { key: 'shifts', label: lang === 'en' ? 'Shifts' : 'فتح/إغلاق الوردية' },
+    { key: 'discount', label: lang === 'en' ? 'Discount' : 'منح خصم يدوي' },
+    { key: 'voidItem', label: lang === 'en' ? 'Void Item' : 'حذف/إلغاء صنف' },
+    { key: 'barista', label: lang === 'en' ? 'Barista KDS' : 'شاشة الباريستا' },
     { key: 'receiving', label: lang === 'en' ? 'Receiving' : 'استلام الخامات' },
-    { key: 'inventory', label: lang === 'en' ? 'Inventory' : 'المخزن' },
+    { key: 'inventory', label: lang === 'en' ? 'Inventory' : 'المخزن والجرد' },
+    { key: 'itemAvailability', label: lang === 'en' ? 'Item Availability' : 'إخفاء الأصناف المؤقت' },
     { key: 'dashboard', label: lang === 'en' ? 'Dashboard' : 'الأرباح والتقارير' },
-    { key: 'discount', label: lang === 'en' ? 'Discount' : 'منح خصم' },
     { key: 'settings', label: lang === 'en' ? 'Settings' : 'الإعدادات' },
   ]
-  const [newStaffPerms, setNewStaffPerms] = useState({ pos: true, receiving: false, inventory: false, dashboard: false, discount: false, settings: false })
+  const [newStaffPerms, setNewStaffPerms] = useState({ waiter: false, pos: true, shifts: true, discount: false, voidItem: false, barista: true, receiving: false, inventory: false, itemAvailability: false, dashboard: false, settings: false })
+
+  function exportFullBackupJson() {
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      shopName,
+      currency,
+      branches,
+      coupons,
+      features,
+      items: items || [],
+      ingredients: ingredients || [],
+      recipes: recipes || [],
+      staff: getStaffList(),
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `neom-backup-${todayStr()}.json`
+    a.click()
+  }
 
   function handleAddStaff(e) {
     e.preventDefault()
     if (!newStaffName.trim() || !newStaffPin.trim()) return
     const perms = newStaffRole === 'manager'
-      ? { pos: true, receiving: true, inventory: true, dashboard: true, discount: true, settings: true }
+      ? { waiter: true, pos: true, shifts: true, discount: true, voidItem: true, barista: true, receiving: true, inventory: true, itemAvailability: true, dashboard: true, settings: true }
       : newStaffPerms
     const updated = [...staff, { id: `staff-${Date.now()}`, displayName: newStaffName.trim(), pin: newStaffPin.trim(), role: newStaffRole, perms }]
     setStaff(updated)
@@ -1844,6 +1996,12 @@ saveStaffList(updated)
             <span>🍎 {lang === 'en' ? 'Install on iPhone (iOS)' : 'طريقة التثبيت على الآيفون (iOS)'}</span>
           </button>
         </div>
+      </div>
+      <div className="bg-white p-5 rounded-2xl shadow-sm space-y-2 border border-[#123B36]/10">
+        <h3 className="font-extrabold text-sm text-[#123B36]">💾 {lang === 'en' ? 'System Backup' : 'النسخ الاحتياطي للنظام'}</h3>
+        <button type="button" onClick={exportFullBackupJson} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-extrabold py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition">
+          <Download size={16} /> {lang === 'en' ? 'Download Full Backup (JSON)' : 'تحميل نسخة احتياطية كاملة (JSON)'}
+        </button>
       </div>
     </div>
   )
