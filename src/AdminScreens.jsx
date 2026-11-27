@@ -354,6 +354,18 @@ const SEED_RECIPES = [
   { itemName: 'عصير تانك مانجو', lines: [{ name: 'عصير تانك مانجو', qty: 370 }, { name: 'سكر خشن', qty: 440 }] },
   { itemName: 'عصير فيمتو', lines: [{ name: 'فيمتو', qty: 500 }, { name: 'سكر خشن', qty: 440 }] },
   ]
+const { data: shipments } = useLiveShared('shipments', { order: '-createdAt', limit: 200 })
+
+  const expiringItems = useMemo(() => {
+    const today = new Date()
+    const in7Days = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const todayIso = today.toISOString().slice(0, 10)
+    const limitIso = in7Days.toISOString().slice(0, 10)
+    return (shipments || []).filter((s) => s.expiry_date && s.expiry_date <= limitIso).map((s) => ({
+      ...s,
+      isExpired: s.expiry_date < todayIso,
+    }))
+  }, [shipments])
 export function DashboardScreen({ invoices = [], ingredients = [], recipes = [], shifts = [], settings, features = {}, currentBranch = 'الفرع الرئيسي - صلالة', lang = 'ar' }) {
   const { data: expenses } = useLiveShared('expenses', { order: '-createdAt', limit: 200 })
   const { data: wasteLogs } = useLiveShared('waste_logs', { order: '-createdAt', limit: 200 })
@@ -662,7 +674,26 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
           <MessageCircle size={15} /> {lang === 'en' ? 'Send Owner WhatsApp' : 'إرسال تقرير المالك واتساب'}
         </button>
       </div>
-
+{expiringItems.length > 0 && (
+        <div className="bg-orange-50 dark:bg-orange-950/40 border-2 border-orange-400 p-4 rounded-2xl space-y-2">
+          <div className="font-extrabold text-sm text-orange-900 dark:text-orange-300 flex items-center gap-1.5">
+            ⏳ {lang === 'en' ? `Expiry Alerts (${expiringItems.length} items expiring within 7 days)` : `تنبيهات انتهاء الصلاحية (${expiringItems.length} خامات قريبة الانتهاء أو منتهية)`}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {expiringItems.map((s) => (
+              <div key={s.id} className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${s.isExpired ? 'bg-red-100/80 dark:bg-red-900/40 border-red-400 text-red-900 dark:text-red-200' : 'bg-white dark:bg-slate-800 border-orange-300 dark:border-orange-700 text-[#123B36] dark:text-slate-100'}`}>
+                <div>
+                  <div className="font-extrabold">{s.material}</div>
+                  <div className="text-[11px] opacity-80">{lang === 'en' ? 'Expiry:' : 'الصلاحية:'} {s.expiry_date}</div>
+                </div>
+                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold ${s.isExpired ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}`}>
+                  {s.isExpired ? (lang === 'en' ? 'Expired' : 'منتهي') : (lang === 'en' ? 'Soon' : 'قريب')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {features.fraudDetection && fraudAlerts.length > 0 && (
         <div className="bg-red-50 border-2 border-red-400 p-4 rounded-2xl space-y-2">
           <div className="font-extrabold text-red-900 text-sm flex items-center gap-2">
@@ -1293,21 +1324,40 @@ const [ocrScanning, setOcrScanning] = useState(false)
           </form>
 
           {editIng && (
-            <form onSubmit={saveEditIng} className="bg-amber-50 border border-amber-300 p-2.5 rounded-xl flex flex-wrap items-center gap-2 text-xs">
-              <span className="font-extrabold text-amber-900">{lang === 'en' ? 'Edit:' : 'تعديل خامة:'}</span>
-              <input value={editIng.name} onChange={(e) => setEditIng({ ...editIng, name: e.target.value })} className="flex-1 min-w-[120px] bg-white px-2 py-1 rounded-lg border font-bold" />
-              <input type="number" step="any" value={editIng.stock} onChange={(e) => setEditIng({ ...editIng, stock: e.target.value })} placeholder="الرصيد" className="w-20 bg-white px-2 py-1 rounded-lg border font-bold" />
-              <select value={editIng.unit} onChange={(e) => setEditIng({ ...editIng, unit: e.target.value })} className="bg-white px-2 py-1 rounded-lg border font-bold">
-                <option value="جم">جم</option>
-                <option value="مل">مل</option>
-                <option value="حبة">حبة</option>
-              </select>
-              <input type="number" step="any" value={editIng.cost || 0} onChange={(e) => setEditIng({ ...editIng, cost: e.target.value })} placeholder="سعر الوحدة" className="w-24 bg-white px-2 py-1 rounded-lg border font-bold text-amber-800" />
-              <input type="number" step="any" value={editIng.minStock || 500} onChange={(e) => setEditIng({ ...editIng, minStock: e.target.value })} placeholder="حد التنبيه" className="w-20 bg-white px-2 py-1 rounded-lg border" />
-              <button type="submit" className="bg-emerald-700 text-white px-2.5 py-1 rounded-lg font-bold">{lang === 'en' ? 'Save' : 'حفظ'}</button>
-              <button type="button" onClick={() => setEditIng(null)} className="bg-white px-2.5 py-1 rounded-lg border">{lang === 'en' ? 'Cancel' : 'إلغاء'}</button>
-            </form>
-          )}
+    <form onSubmit={saveEditIng} className="bg-amber-50 dark:bg-slate-900 border-2 border-amber-400 dark:border-amber-500/50 p-3 rounded-2xl space-y-2.5 text-xs">
+      <div className="font-extrabold text-amber-900 dark:text-amber-300 text-sm">✏️ {lang === 'en' ? 'Edit Material:' : 'تعديل بيانات الخامة:'} {editIng.name}</div>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div>
+          <label className="block text-[10px] font-bold text-[#123B36] dark:text-slate-300 mb-1">{lang === 'en' ? 'Name' : 'اسم الخامة'}</label>
+          <input value={editIng.name} onChange={(e) => setEditIng({ ...editIng, name: e.target.value })} className="w-full bg-white dark:bg-slate-800 text-[#123B36] dark:text-white px-2.5 py-1.5 rounded-xl border border-gray-300 dark:border-slate-600 font-bold" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-[#123B36] dark:text-slate-300 mb-1">{lang === 'en' ? 'Current Stock' : 'الرصيد المتوفر'}</label>
+          <input type="number" step="any" value={editIng.stock} onChange={(e) => setEditIng({ ...editIng, stock: e.target.value })} className="w-full bg-white dark:bg-slate-800 text-[#123B36] dark:text-amber-300 px-2.5 py-1.5 rounded-xl border border-gray-300 dark:border-slate-600 font-extrabold" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-[#123B36] dark:text-slate-300 mb-1">{lang === 'en' ? 'Unit' : 'الوحدة'}</label>
+          <select value={editIng.unit} onChange={(e) => setEditIng({ ...editIng, unit: e.target.value })} className="w-full bg-white dark:bg-slate-800 text-[#123B36] dark:text-white px-2.5 py-1.5 rounded-xl border border-gray-300 dark:border-slate-600 font-bold">
+            <option value="جم">جم (جرام)</option>
+            <option value="مل">مل (مليلتر)</option>
+            <option value="حبة">حبة / قطعة</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-[#123B36] dark:text-slate-300 mb-1">{lang === 'en' ? 'Cost per Unit' : `تكلفة الـ 1 ${editIng.unit || 'جم'}`}</label>
+          <input type="number" step="any" value={editIng.cost || 0} onChange={(e) => setEditIng({ ...editIng, cost: e.target.value })} className="w-full bg-white dark:bg-slate-800 text-[#123B36] dark:text-emerald-300 px-2.5 py-1.5 rounded-xl border border-gray-300 dark:border-slate-600 font-extrabold" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-[#123B36] dark:text-slate-300 mb-1">{lang === 'en' ? 'Low Stock Alert' : 'حد التنبيه الأدنى'}</label>
+          <input type="number" step="any" value={editIng.minStock || 500} onChange={(e) => setEditIng({ ...editIng, minStock: e.target.value })} className="w-full bg-white dark:bg-slate-800 text-[#123B36] dark:text-rose-300 px-2.5 py-1.5 rounded-xl border border-gray-300 dark:border-slate-600 font-bold" />
+        </div>
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-1.5 rounded-xl font-extrabold">{lang === 'en' ? 'Save' : 'حفظ التعديل'}</button>
+        <button type="button" onClick={() => setEditIng(null)} className="bg-white dark:bg-slate-700 text-[#123B36] dark:text-white px-4 py-1.5 rounded-xl border dark:border-slate-600 font-bold">{lang === 'en' ? 'Cancel' : 'إلغاء'}</button>
+      </div>
+    </form>
+  )}
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 max-h-[520px] overflow-y-auto">
             {ingredients.filter((i) => !search || i.name.includes(search)).map((ing) => {
@@ -1315,14 +1365,27 @@ const [ocrScanning, setOcrScanning] = useState(false)
               const prevCost = Number(ing.prev_cost || 0)
               const diffPct = (cost > 0 && prevCost > 0 && Math.abs(cost - prevCost) > 0.00001) ? Math.round(((cost - prevCost) / prevCost) * 100) : 0
               return (
-                <div key={ing.id} className="bg-[#F4F1EA] p-2 rounded-xl text-[11px] flex flex-col justify-between gap-1.5 border border-[#123B36]/10">
-                  <div>
-                    <div className="font-extrabold text-xs text-[#123B36] truncate" title={ing.name}>{ing.name}</div>
-                    <div className="text-[#123B36]/75 mt-0.5">
-                      {lang === 'en' ? 'Stock:' : 'الرصيد:'} <span className="font-extrabold text-[#123B36]">{ing.stock} {ing.unit}</span>
-                    </div>
-                    <div className="text-amber-800 font-bold mt-0.5 flex flex-wrap items-center gap-1">
-                      <span>{lang === 'en' ? 'Cost:' : 'السعر:'} {cost > 0 ? `${cost.toFixed(4)} ${currency}/${ing.unit}` : (lang === 'en' ? 'Not set' : 'غير محدد')}</span>
+               <div key={ing.id} className="bg-[#F4F1EA] dark:bg-slate-800/90 border border-[#123B36]/10 dark:border-slate-700 p-2.5 rounded-xl text-[11px] flex flex-col justify-between">
+                      <div>
+                        <div className="font-extrabold text-xs text-[#123B36] dark:text-white truncate" title={ing.name}>{ing.name}</div>
+                        <div className="text-[#123B36]/80 dark:text-slate-300 mt-1">
+                          {lang === 'en' ? 'Stock:' : 'الرصيد:'}{' '}
+                          <span className="font-extrabold text-[#123B36] dark:text-amber-300">
+                            {Number(ing.stock || 0).toLocaleString()} {ing.unit}
+                            {(ing.unit === 'جم' || ing.unit === 'مل') && Number(ing.stock || 0) >= 1000
+                              ? ` (${(Number(ing.stock) / 1000).toFixed(2)} ${ing.unit === 'جم' ? 'كجم' : 'لتر'})`
+                              : ''}
+                          </span>
+                        </div>
+                        <div className="text-amber-800 dark:text-emerald-300 font-bold mt-0.5 flex flex-wrap items-center gap-1">
+                          <span>
+                            {lang === 'en' ? 'Cost:' : 'التكلفة:'}{' '}
+                            {cost > 0
+                              ? (ing.unit === 'جم' || ing.unit === 'مل')
+                                ? `${(cost * 1000).toFixed(3)} ${currency}/${ing.unit === 'جم' ? 'كجم' : 'لتر'}`
+                                : `${cost.toFixed(3)} ${currency}/${ing.unit}`
+                              : (lang === 'en' ? 'Not set' : 'غير محدد')}
+                          </span>
                       {diffPct !== 0 && (
                         <span className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold ${diffPct > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {diffPct > 0 ? `↑+${diffPct}%` : `↓${diffPct}%`}
