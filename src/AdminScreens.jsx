@@ -342,7 +342,7 @@ const SEED_RECIPES = [
   { itemName: 'إضافة توبينج اناناس', lines: [{ name: 'توبينج اناناس', qty: 25 }] },
   { itemName: 'إضافة توبينج باشن', lines: [{ name: 'توبينج باشن', qty: 25 }] },
   { itemName: 'إضافة باكيت شاي احمر', lines: [{ name: 'شاي احمر باكيت', qty: 1 }] },
-  { itemName: 'إضافة عسل النحل', lines: [{ name: 'عسل نحل', qty: 20 }] },
+
   // البوفيهات والضيافة
   { itemName: 'سفنديش ام علي كبير', lines: [{ name: 'حليب', qty: 1000 }, { name: 'بندق', qty: 15 }, { name: 'لوز', qty: 15 }, { name: 'فستق', qty: 20 }, { name: 'جوز هند', qty: 30 }, { name: 'ملفيه', qty: 650 }, { name: 'تصنيعية كريم شانتي', qty: 700 }] },
   { itemName: 'سفنديش ام علي وسط', lines: [{ name: 'حليب', qty: 500 }, { name: 'بندق', qty: 15 }, { name: 'لوز', qty: 15 }, { name: 'فستق', qty: 20 }, { name: 'جوز هند', qty: 30 }, { name: 'ملفيه', qty: 400 }, { name: 'تصنيعية كريم شانتي', qty: 400 }] },
