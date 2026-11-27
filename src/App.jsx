@@ -5,6 +5,7 @@ import { auth } from './lib/auth'
 import { useLiveShared } from './lib/useLive'
 import TeamLogin from './components/TeamLogin'
 import { DashboardScreen, InventoryScreen, SettingsScreen } from './AdminScreens'
+import { scanDocumentOcr } from './lib/ocr'
 
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const fmt = (n) => Number(n || 0).toFixed(3)
@@ -64,15 +65,15 @@ const settings = (settingsList && settingsList.length > 0) ? settingsList.at(0) 
   }
 
   const up = user?.perms || (isManager
-    ? { pos: true, receiving: true, inventory: true, dashboard: true, discount: true, settings: true }
-    : { pos: true, receiving: true, inventory: false, dashboard: false, discount: false, settings: false })
+    ? { waiter: true, pos: true, shifts: true, discount: true, voidItem: true, barista: true, receiving: true, inventory: true, itemAvailability: true, dashboard: true, settings: true }
+    : { waiter: false, pos: true, shifts: true, discount: false, voidItem: false, barista: true, receiving: true, inventory: false, itemAvailability: false, dashboard: false, settings: false })
 
   const baseNav = [
     ...((isManager || up.dashboard) ? [{ id: 'dashboard', label: lang === 'en' ? 'Dashboard' : 'الرئيسية والأرباح', icon: LayoutDashboard }] : []),
-    ...((isManager || up.pos) ? [{ id: 'sales', label: lang === 'en' ? 'POS' : 'الكاشير', icon: ShoppingCart }] : []),
-    ...((f.barista && (isManager || up.pos)) ? [{ id: 'barista', label: lang === 'en' ? 'Barista' : 'الباريستا', icon: Coffee }] : []),
+    ...((isManager || up.pos || up.waiter) ? [{ id: 'sales', label: lang === 'en' ? 'POS' : 'الكاشير', icon: ShoppingCart }] : []),
+    ...((f.barista && (isManager || up.barista || up.pos)) ? [{ id: 'barista', label: lang === 'en' ? 'Barista' : 'الباريستا', icon: Coffee }] : []),
     ...((isManager || up.receiving) ? [{ id: 'materials', label: lang === 'en' ? 'Receiving' : 'استلام الخامات', icon: Truck }] : []),
-    ...((isManager || up.inventory) ? [{ id: 'inventory', label: lang === 'en' ? 'Inventory' : 'المخزن والوصفات', icon: Boxes }] : []),
+    ...((isManager || up.inventory || up.itemAvailability) ? [{ id: 'inventory', label: lang === 'en' ? 'Inventory' : 'المخزن والوصفات', icon: Boxes }] : []),
     ...((isManager || up.settings) ? [{ id: 'settings', label: lang === 'en' ? 'Settings' : 'الإعدادات', icon: SlidersHorizontal }] : []),
   ]
 
@@ -268,10 +269,26 @@ const settings = (settingsList && settingsList.length > 0) ? settingsList.at(0) 
   const cleanPhone = phone.replace(/\D/g, '')
   const customer = useMemo(() => cleanPhone.length >= 8 ? (customers || []).find((c) => c.phone === cleanPhone) : null, [customers, cleanPhone])
 
+ const isManager = user?.role === 'manager'
+  const perms = user?.perms || {}
+  const canCheckout = isManager || !!perms.pos
+  const canDiscount = isManager || !!perms.discount
+  const canVoidItem = isManager || !!perms.voidItem
+
   const subTotal = cart.reduce((s, l) => s + l.price * l.qty, 0)
-  const extraDiscount = Number(manualDiscount || 0)
+  const extraDiscount = canDiscount ? Number(manualDiscount || 0) : 0
   const couponDiscount = appliedCoupon ? (appliedCoupon.type === 'percent' ? (subTotal * Number(appliedCoupon.value)) / 100 : Number(appliedCoupon.value)) : 0
-  const totalDiscount = redeemDiscount + extraDiscount + couponDiscount
+  const happyHourDiscount = useMemo(() => {
+    if (!features?.happyHour || !settings?.happyHour?.enabled) return 0
+    const now = new Date()
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    const { start, end, percent } = settings.happyHour
+    if (start && end && hhmm >= start && hhmm <= end && Number(percent) > 0) {
+      return (subTotal * Number(percent)) / 100
+    }
+    return 0
+  }, [features?.happyHour, settings?.happyHour, subTotal])
+  const totalDiscount = redeemDiscount + extraDiscount + couponDiscount + happyHourDiscount
   const total = Math.max(0, subTotal - totalDiscount)
   const commissionAmount = Number(((total * commRate) / 100).toFixed(3))
   const nextOrderNum = `#${String((invoices || []).filter((inv) => inv.date === todayStr()).length + offlineQueue.length + 1).padStart(2, '0')}`
@@ -597,7 +614,7 @@ const [nowTick, setNowTick] = useState(Date.now())
                     <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: Math.max(1, x.qty - 1) } : x))} className="w-6 h-6 bg-white rounded-lg font-bold">-</button>
                     <span className="font-bold w-4 text-center">{l.qty}</span>
                     <button onClick={() => setCart((p) => p.map((x, i) => i === idx ? { ...x, qty: x.qty + 1 } : x))} className="w-6 h-6 bg-white rounded-lg font-bold">+</button>
-                    <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="text-red-600 p-1"><Trash2 size={13} /></button>
+                    {canVoidItem && <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="text-red-600 p-1"><Trash2 size={13} /></button>}
                   </div>
                 </div>
               ))}
@@ -611,10 +628,12 @@ const [nowTick, setNowTick] = useState(Date.now())
                   <StickyNote size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
                   <input value={orderNote} onChange={(e) => setOrderNote(e.target.value)} placeholder={lang === 'en' ? 'Note...' : 'ملاحظة...'} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none" />
                 </div>
-                <div className="relative">
-                  <Percent size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
-                  <input type="number" step="0.050" min="0" value={manualDiscount} onChange={(e) => setManualDiscount(e.target.value)} placeholder={lang === 'en' ? `Discount` : `خصم (${currency})`} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-[11px] outline-none font-bold" />
-                </div>
+                {canDiscount && (
+  <div className="relative">
+    <Percent size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#123B36]/40" />
+    <input type="number" step="0.050" min="0" value={manualDiscount} onChange={(e) => setManualDiscount(e.target.value)} placeholder={lang === 'en' ? 'Manual discount' : 'خصم يدوي'} className="w-full bg-[#F4F1EA] pr-7 pl-2 py-1.5 rounded-xl text-xs" />
+  </div>
+)}
               </div>
               {features.coupons && (
                 <div className="flex gap-1.5">
@@ -706,9 +725,11 @@ const [nowTick, setNowTick] = useState(Date.now())
             >
               {lang === 'en' ? 'Barista KOT' : 'تذكرة باريستا'}
             </button>
-            <button onClick={checkout} disabled={!cart.length || busy} className="flex-[1.4] py-2.5 rounded-xl bg-[#123B36] hover:bg-[#123B36]/90 text-white font-extrabold text-sm disabled:opacity-40">
-              {busy ? '...' : (lang === 'en' ? 'Complete Sale' : 'إتمام البيع')}
-            </button>
+            {canCheckout && (
+              <button onClick={checkout} disabled={!cart.length || busy} className="flex-[1.4] py-2.5 rounded-xl bg-[#123B36] hover:bg-[#123B36]/90 text-white font-extrabold text-sm disabled:opacity-40">
+                {busy ? '...' : (lang === 'en' ? 'Complete Sale' : 'إتمام البيع')}
+              </button>
+            )}
           </div>
         </div>
 
@@ -851,7 +872,24 @@ function BaristaScreen({ invoices = [], currentBranch, showBranch, lang = 'ar' }
   const [expiryDate, setExpiryDate] = useState('')
   const [done, setDone] = useState(false)
   const [priceAlert, setPriceAlert] = useState(null)
+const [ocrMatBusy, setOcrMatBusy] = useState(false)
 
+  async function handleOcrMaterial(e) {
+    const file = e.target.files && e.target.files.item(0)
+    if (!file) return
+    setOcrMatBusy(true)
+    try {
+      const res = await scanDocumentOcr(file)
+      if (res.firstItem) {
+        setMaterial(res.firstItem.name)
+        if (res.firstItem.qty) setQty(String(res.firstItem.qty))
+      }
+      if (res.totalAmount) setPrice(res.totalAmount)
+    } finally {
+      setOcrMatBusy(false)
+      e.target.value = ''
+    }
+  }
   async function handleSave(e) {
     e.preventDefault()
     if (!material || !qty) return
@@ -909,7 +947,12 @@ function BaristaScreen({ invoices = [], currentBranch, showBranch, lang = 'ar' }
   return (
     <div className="space-y-4">
       <form onSubmit={handleSave} className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
-        <h2 className="font-extrabold text-base">{lang === 'en' ? 'Receive Raw Materials & Supplier Invoices' : 'تسجيل استلام خامات وفواتير الموردين'}</h2>
+       <h2 className="font-extrabold text-base">{lang === 'en' ? 'Receive Raw Materials & Supplier Invoices' : 'تسجيل استلام خامات وفواتير الموردين'}</h2>
+        <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3.5 py-2 rounded-xl font-extrabold cursor-pointer text-xs">
+          <Camera size={15} />
+          <span>{ocrMatBusy ? '⏳ جاري قراءة الفاتورة...' : '📸 مسح فاتورة المورد بالكاميرا (OCR بدون حفظ صورة)'}</span>
+          <input type="file" accept="image/*" capture="environment" onChange={handleOcrMaterial} className="hidden" />
+        </label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-bold block mb-1">{lang === 'en' ? 'Material Name *' : 'اسم المادة *'}</label>
@@ -1023,9 +1066,32 @@ function BaristaScreen({ invoices = [], currentBranch, showBranch, lang = 'ar' }
     onClose()
   }
 
-  async function handleClose() {
+ async function handleClose() {
     const expected = Number(openShift.opening_cash || 0) + cashSales
-    await db.updateShared('shifts', openShift.id, { closing_cash: Number(cashInput || 0), expected_cash: expected, cash_sales: cashSales, card_sales: cardSales, status: 'closed', closed_at: new Date().toISOString() })
+    const actual = Number(cashInput || 0)
+    const diff = actual - expected
+    await db.updateShared('shifts', openShift.id, { closing_cash: actual, expected_cash: expected, cash_sales: cashSales, card_sales: cardSales, status: 'closed', closed_at: new Date().toISOString() })
+
+    const headers = ['التاريخ', 'الكاشير', 'عدد الفواتير', 'الرصيد الافتتاحي', 'مبيعات الكاش', 'مبيعات البطاقة', 'الإجمالي', 'الكاش المتوقع', 'الكاش الفعلي', 'الفرق']
+    const row = [
+      todayStr(),
+      openShift.cashier_name || user?.displayName || '',
+      todayInvoices.length,
+      Number(openShift.opening_cash || 0).toFixed(3),
+      cashSales.toFixed(3),
+      cardSales.toFixed(3),
+      (cashSales + cardSales).toFixed(3),
+      expected.toFixed(3),
+      actual.toFixed(3),
+      diff.toFixed(3),
+    ]
+    const csv = '\uFEFF' + [headers, row].map((r) => r.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `shift-close-${todayStr()}.csv`
+    a.click()
+
     onClose()
   }
 
