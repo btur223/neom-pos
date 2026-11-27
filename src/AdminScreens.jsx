@@ -1882,20 +1882,22 @@ saveStaffList(updated)
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <div className="max-w-5xl mx-auto space-y-4">
       <div className="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-[#123B36]/10">
-        <h3 className="font-extrabold text-base text-[#123B36]">🎛️ {lang === 'en' ? 'System Features Control (Toggle On/Off)' : 'التحكم بمميزات النظام (تشغيل / إيقاف حسب الحاجة)'}</h3>
-        <p className="text-xs text-[#123B36]/65">{lang === 'en' ? 'Enable the features you need now and turn off the rest to keep the interface simple.' : 'فعّل المميزات التي تحتاجها حالياً وأوقف الباقي لتبسيط الواجهة، ويمكنك تشغيلها بضغطة زر في أي وقت مستقبلاً.'}</p>
-        <div className="space-y-2">
+        <h3 className="font-extrabold text-base text-[#123B36]">🎛️ {lang === 'en' ? 'System Features Control (Toggle On/Off)' : 'التحكم بميزات النظام (تشغيل / إيقاف)'}</h3>
+        <p className="text-xs text-[#123B36]/65">{lang === 'en' ? 'Enable the features you need now and turn off the rest to keep the interface simple.' : 'فعّل الميزات التي تحتاجها الآن وأوقف البقية لتبقى الواجهة بسيطة وسريعة.'}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {featureLabels.map((item) => (
-            <div key={item.key} onClick={() => toggleFeature(item.key)} className="flex items-center justify-between gap-3 bg-[#F4F1EA] p-3.5 rounded-xl cursor-pointer hover:border-[#123B36]/30 border border-transparent transition">
+            <div key={item.key} onClick={() => toggleFeature(item.key)} className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between gap-2.5 ${features[item.key] ? 'bg-emerald-50/70 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-700' : 'bg-[#F4F1EA] border-[#123B36]/10 opacity-80'}`}>
               <div>
-                <div className="font-extrabold text-xs text-[#123B36]">{item.title}</div>
-                <div className="text-[11px] text-[#123B36]/60 mt-0.5">{item.desc}</div>
+                <div className="font-extrabold text-xs text-[#123B36]">{lang === 'en' ? item.title : item.title.replace(/\s*\([A-Za-z\s&/+-]+\)\s*/g, '')}</div>
+                <div className="text-[11px] text-[#123B36]/70 mt-1 leading-relaxed">{item.desc}</div>
               </div>
-              <button type="button" className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition shrink-0 ${features[item.key] ? 'bg-emerald-600 text-white' : 'bg-gray-300 text-gray-700'}`}>
-                {features[item.key] ? (lang === 'en' ? 'Active ✓' : 'مُفعّل ✓') : (lang === 'en' ? 'Off' : 'مُعطّل')}
-              </button>
+              <div className="flex justify-end pt-1 border-t border-[#123B36]/10">
+                <button type="button" className={`px-3 py-1 rounded-lg text-[11px] font-extrabold transition ${features[item.key] ? 'bg-emerald-700 text-white' : 'bg-white text-[#123B36]/70 border'}`}>
+                  {features[item.key] ? (lang === 'en' ? 'Active ✓' : 'مفعّل ✓') : (lang === 'en' ? 'Off' : 'معطّل')}
+                </button>
+              </div>
             </div>
           ))}
         </div>
