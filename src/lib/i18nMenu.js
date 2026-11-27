@@ -1,4 +1,4 @@
-const CAT_EN = {
+const AR_TO_EN = {
   'الكل': 'All',
   'القهوة الباردة': 'Iced Coffee',
   'القهوة الساخنة': 'Hot Coffee',
@@ -11,9 +11,6 @@ const CAT_EN = {
   'عصائر فريش': 'Fresh Juices',
   'الضيافة': 'Hospitality',
   'البوكسات': 'Boxes',
-}
-
-const ITEM_EN = {
   'بارد V60': 'Iced V60',
   'حار V60': 'Hot V60',
   'إضافة باكيت شاي احمر': 'Add Red Tea Bag',
@@ -55,11 +52,53 @@ const ITEM_EN = {
   'سفن اب': '7Up',
   'سفنديش ام علي كبير': 'Large Om Ali Sandwich',
   'سفنديش ام علي وسط': 'Medium Om Ali Sandwich',
+  'افوكادو': 'Avocado',
+  'برتقال': 'Orange',
+  'بسكويت اوريو': 'Oreo Biscuits',
+  'بطيخ': 'Watermelon',
+  'بن اسبريسو': 'Espresso Beans',
+  'بن تركي': 'Turkish Coffee',
+  'بن مختصة': 'Specialty Coffee',
+  'بندق': 'Hazelnut',
+  'بودرة هوت شوكليت': 'Hot Chocolate Powder',
+  'تشيز كيك جاهز': 'Ready Cheesecake',
+  'تصفية كريم شانتي': 'Whipped Cream',
+  'توبينج اناناس': 'Pineapple Topping',
+  'حليب': 'Milk',
+  'سكر خشن': 'Granulated Sugar',
+  'صوص شوكليت': 'Chocolate Sauce',
+  'صوص نوتيلا': 'Nutella Sauce',
+  'عسل النحل': 'Honey',
+  'فستق': 'Pistachio',
+  'لوز': 'Almonds',
+  'مانجو': 'Mango',
+  'فراولة': 'Strawberry',
+  'فانيليا': 'Vanilla',
+  'ليمون': 'Lemon',
+  'نعناع': 'Mint',
+  'سفن اب': '7Up',
+  'فيمتو': 'Vimto',
+  'كنافة': 'Kunafa',
+  'قشطة': 'Cream (Qishta)',
+  'مكسرات': 'Nuts',
+  'شاي احمر': 'Red Tea',
+  'كجم': 'kg',
+  'جم': 'g',
+  'لتر': 'L',
+  'مل': 'ml',
+  'حبة': 'pcs',
+}
+
+const EN_TO_AR = {
+  'System Features Control (Toggle On/Off)': 'التحكم بميزات النظام (تشغيل / إيقاف)',
+  'Enable the features you need now and turn off the rest to keep the interface simple.': 'فعّل الميزات التي تحتاجها الآن وأوقف البقية لتبقى الواجهة بسيطة وسريعة.',
+  'Active ✓': 'مفعّل ✓',
+  'Off': 'متوقف',
 }
 
 export function tCat(cat, lang) {
   if (lang !== 'en') return cat
-  return CAT_EN[cat] || cat
+  return AR_TO_EN[cat] || cat
 }
 
 export function tItem(item, lang) {
@@ -67,5 +106,50 @@ export function tItem(item, lang) {
   const name = typeof item === 'string' ? item : item.name
   if (lang !== 'en') return name
   if (typeof item === 'object' && item.name_en) return item.name_en
-  return ITEM_EN[name] || name
+  return AR_TO_EN[name] || name
+}
+
+export function installAutoTranslator() {
+  if (typeof window === 'undefined' || window.__neomAutoTranslatorInstalled) return
+  window.__neomAutoTranslatorInstalled = true
+
+  const translateNode = (node, lang) => {
+    if (!node) return
+    if (node.nodeType === 3) {
+      const raw = node.nodeValue
+      if (!raw || !raw.trim()) return
+      if (!node.__origText) node.__origText = raw
+      const base = node.__origText.trim()
+      const lead = node.__origText.match(/^\s*/)[0]
+      const trail = node.__origText.match(/\s*$/)[0]
+
+      if (lang === 'en') {
+        if (AR_TO_EN[base]) {
+          const next = lead + AR_TO_EN[base] + trail
+          if (node.nodeValue !== next) node.nodeValue = next
+        }
+      } else {
+        const cleaned = base.replace(/\s*\([A-Za-z\s&/+-]+\)\s*/g, '').trim()
+        const target = EN_TO_AR[base] || (cleaned !== base ? cleaned : base)
+        const next = lead + target + trail
+        if (node.nodeValue !== next) node.nodeValue = next
+      }
+      return
+    }
+    if (node.nodeType === 1 && !['SCRIPT', 'STYLE', 'INPUT', 'TEXTAREA', 'SELECT'].includes(node.tagName)) {
+      node.childNodes.forEach((child) => translateNode(child, lang))
+    }
+  }
+
+  const run = () => {
+    const lang = document.documentElement.lang === 'en' || document.documentElement.dir === 'ltr' ? 'en' : 'ar'
+    translateNode(document.body, lang)
+  }
+
+  const observer = new MutationObserver(() => run())
+  window.addEventListener('DOMContentLoaded', () => {
+    run()
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+  })
+  setInterval(run, 600)
 }
