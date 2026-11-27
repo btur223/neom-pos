@@ -948,9 +948,8 @@ const [ocrMatBusy, setOcrMatBusy] = useState(false)
     <div className="space-y-4">
       <form onSubmit={handleSave} className="bg-white p-5 rounded-2xl shadow-sm space-y-3">
        <h2 className="font-extrabold text-base">{lang === 'en' ? 'Receive Raw Materials & Supplier Invoices' : 'تسجيل استلام خامات وفواتير الموردين'}</h2>
-        <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3.5 py-2 rounded-xl font-extrabold cursor-pointer text-xs">
-          <Camera size={15} />
-          <span>{ocrMatBusy ? '⏳ جاري القراءة...' : '📸 مسح الفاتورة بالكاميرا'}</span>
+       <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3.5 py-2 rounded-xl font-extrabold cursor-pointer text-xs">
+          <span>{ocrMatBusy ? 'Reading...' : 'Scan Invoice (OCR)'}</span>
           <input type="file" accept="image/*" capture="environment" onChange={handleOcrMaterial} className="hidden" />
         </label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
