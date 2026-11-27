@@ -4,8 +4,8 @@
 
 body {
   font-family: system-ui, -apple-system, sans-serif;
-  background-color: #F4F1EA;
-  color: #123B36;
+  background-color: #16110D;
+  color: #F5EFEA;
   user-select: none;
 }
 
@@ -14,92 +14,51 @@ body {
   #receipt-print, #receipt-print * { visibility: visible; }
   #receipt-print { position: fixed; left: 0; top: 0; width: 100%; }
 }
-/* الثيم الليلي الفاخر - مطابق لتصميم لوحة التحكم */
+
+/* ثيم الكافيه الدافئ المريح للعين - Roasted Espresso & Warm Caramel */
 body,
 .bg-\[\#F4F1EA\] {
-  background-color: #131824 !important;
-  color: #E2E8F0 !important;
+  background-color: #16110D !important;
+  color: #F5EFEA !important;
 }
 
 .bg-white {
-  background-color: #1C2333 !important;
-  border-color: rgba(255, 255, 255, 0.07) !important;
-  color: #F8FAFC !important;
+  background-color: #221A14 !important;
+  border-color: rgba(230, 184, 125, 0.14) !important;
+  color: #FAF6F2 !important;
+}
+
+.bg-emerald-50,
+.bg-emerald-50\/70,
+.bg-amber-50,
+.bg-orange-50 {
+  background-color: #2B2119 !important;
+  border-color: rgba(230, 184, 125, 0.22) !important;
+  color: #F5EFEA !important;
 }
 
 header.bg-\[\#123B36\] {
-  background-color: #0E121B !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: #110D0A !important;
+  border-bottom: 1px solid rgba(230, 184, 125, 0.16) !important;
 }
 
 button.bg-\[\#123B36\],
 .bg-\[\#123B36\] {
-  background: linear-gradient(135deg, #2DD4BF, #3B82F6) !important;
-  color: #0F172A !important;
+  background: linear-gradient(135deg, #D99B52, #B87632) !important;
+  color: #140E0A !important;
   font-weight: 800 !important;
 }
 
-input, select {
-  background-color: #131824 !important;
-  color: #F8FAFC !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+input, select, textarea {
+  background-color: #1A140F !important;
+  color: #FAF6F2 !important;
+  border: 1px solid rgba(230, 184, 125, 0.2) !important;
 }
 
 .text-\[\#123B36\],
+.text-\[\#123B36\]\/80,
 .text-\[\#123B36\]\/70,
 .text-\[\#123B36\]\/65,
 .text-\[\#123B36\]\/60 {
-  color: #CBD5E1 !important;
-}
-/* ثيم الكافيه الدافئ المريح للعين - Roasted Espresso & Warm Cream */
-.dark body,
-[data-theme="dark"] body {
-  background-color: #18120e !important;
-  color: #f5efea !important;
-}
-
-.dark .bg-white,
-[data-theme="dark"] .bg-white {
-  background-color: #241b15 !important;
-  color: #f5efea !important;
-  border-color: #3a2c23 !important;
-}
-
-.dark .bg-\[\#F4F1EA\],
-.dark .bg-emerald-50,
-.dark .bg-emerald-50\/70,
-.dark .bg-amber-50,
-.dark .bg-slate-800,
-.dark .bg-slate-900,
-[data-theme="dark"] .bg-\[\#F4F1EA\],
-[data-theme="dark"] .bg-emerald-50,
-[data-theme="dark"] .bg-emerald-50\/70,
-[data-theme="dark"] .bg-amber-50,
-[data-theme="dark"] .bg-slate-800,
-[data-theme="dark"] .bg-slate-900 {
-  background-color: #2d221b !important;
-  color: #f5efea !important;
-  border-color: #46352a !important;
-}
-
-.dark .text-\[\#123B36\],
-.dark .text-\[\#123B36\]\/80,
-.dark .text-\[\#123B36\]\/70,
-.dark .text-\[\#123B36\]\/65,
-[data-theme="dark"] .text-\[\#123B36\],
-[data-theme="dark"] .text-\[\#123B36\]\/80,
-[data-theme="dark"] .text-\[\#123B36\]\/70,
-[data-theme="dark"] .text-\[\#123B36\]\/65 {
-  color: #efe6dd !important;
-}
-
-.dark input,
-.dark select,
-.dark textarea,
-[data-theme="dark"] input,
-[data-theme="dark"] select,
-[data-theme="dark"] textarea {
-  background-color: #1c1511 !important;
-  color: #f5efea !important;
-  border-color: #46352a !important;
+  color: #EAE0D5 !important;
 }
