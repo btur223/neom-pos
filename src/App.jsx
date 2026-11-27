@@ -950,7 +950,7 @@ const [ocrMatBusy, setOcrMatBusy] = useState(false)
        <h2 className="font-extrabold text-base">{lang === 'en' ? 'Receive Raw Materials & Supplier Invoices' : 'تسجيل استلام خامات وفواتير الموردين'}</h2>
         <label className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 px-3.5 py-2 rounded-xl font-extrabold cursor-pointer text-xs">
           <Camera size={15} />
-          <span>{ocrMatBusy ? '⏳ جاري قراءة الفاتورة...' : '📸 مسح فاتورة المورد بالكاميرا (OCR بدون حفظ صورة)'}</span>
+          <span>{ocrMatBusy ? '⏳ جاري القراءة...' : '📸 مسح الفاتورة بالكاميرا'}</span>
           <input type="file" accept="image/*" capture="environment" onChange={handleOcrMaterial} className="hidden" />
         </label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
