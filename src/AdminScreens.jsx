@@ -362,7 +362,7 @@ export function DashboardScreen({ invoices = [], ingredients = [], recipes = [],
   const { data: customers } = useLiveShared('customers')
   const { data: feedbacks } = useLiveShared('feedbacks', { order: '-created_at', limit: 50 })
  const { data: shipments } = useLiveShared('shipments', { order: '-createdAt', limit: 200 })
-
+const { data: auditLogs } = useLiveShared('audit_logs', { order: '-created_at', limit: 100 })
   const expiringItems = useMemo(() => {
     const today = new Date()
     const in7Days = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
